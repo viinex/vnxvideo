@@ -1,0 +1,2 @@
+\\?\usb#vid_045e&pid_0779&mi_00#8&2dab2099&0&0000#{65e8773d-8f56-11d0-a3b9-00a0c9223196}\global
+{"colorspace":"YUY2","framerate":30.0,"pin":"Capture","size":[1280,720],"exposure":"auto"}
