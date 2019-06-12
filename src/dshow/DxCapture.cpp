@@ -12,8 +12,8 @@
 #include <dshow.h>
 #include <windows.h>
 
-#include "../json.hpp"
-#include "../jget.h"
+#include <vnxvideo/json.hpp>
+#include <vnxvideo/jget.h>
 
 using json = nlohmann::json;
 
@@ -21,8 +21,8 @@ using json = nlohmann::json;
 // also available as a separate repository at https://github.com/viinex/ambase
 #include <streams.h>
 
-#include "../vnxvideoimpl.h"
-#include "../vnxvideologimpl.h"
+#include <vnxvideo/vnxvideoimpl.h>
+#include <vnxvideo/vnxvideologimpl.h>
 
 #pragma comment(lib, "strmiids.lib")
 #pragma comment(lib, "winmm.lib")

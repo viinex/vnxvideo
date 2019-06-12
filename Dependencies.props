@@ -1,0 +1,35 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ImportGroup Label="PropertySheets" />
+  <PropertyGroup Label="UserMacros">
+    <IPP_HOME>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\ipp</IPP_HOME>
+    <FFMPEG_HOME>C:\sdk\x86.vs8\ffmpeg-3.3.3-i686-w64-mingw32</FFMPEG_HOME>
+    <IDS_UEYE_HOME>C:\sdk\IDS-uEye</IDS_UEYE_HOME>
+    <OPENH264_HOME>C:\sdk\openh264</OPENH264_HOME>
+    <AMBASE_HOME>C:\sdk\ambase</AMBASE_HOME>
+  </PropertyGroup>
+  <PropertyGroup />
+  <ItemDefinitionGroup />
+  <ItemGroup>
+    <BuildMacro Include="IPP_HOME">
+      <Value>$(IPP_HOME)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="FFMPEG_HOME">
+      <Value>$(FFMPEG_HOME)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="IDS_UEYE_HOME">
+      <Value>$(IDS_UEYE_HOME)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="OPENH264_HOME">
+      <Value>$(OPENH264_HOME)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="AMBASE_HOME">
+      <Value>$(AMBASE_HOME)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+  </ItemGroup>
+</Project>

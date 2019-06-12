@@ -2,3 +2,13 @@
 *.so
 Debug/*
 Release/*
+x64/*
+*/Debug/*
+*/Release/*
+*/x64/*
+packages/*
+*.VC.db
+*.VC.opendb
+*/*.aps
+*/*.vcxproj.user
+.vs/*

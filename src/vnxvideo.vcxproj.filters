@@ -36,9 +36,6 @@
     <ClCompile Include="CropResize.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="x264EncoderImpl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="DewarpProjective.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -77,15 +74,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="vnxvideo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vnxvideoimpl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="vnxvideologimpl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="RawSample.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -101,10 +89,22 @@
     <ClInclude Include="Win32Utils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="BufferImpl.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="vnxipp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vnxvideo\BufferImpl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vnxvideo\jget.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vnxvideo\vnxvideo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vnxvideo\vnxvideoimpl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\vnxvideo\vnxvideologimpl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

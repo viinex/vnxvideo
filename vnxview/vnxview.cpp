@@ -3,9 +3,10 @@
 #include <fstream>
 #include <cstdlib>
 #include <mutex>
-#include "../vnxvideo.h"
 
-#include "../vnxvideoimpl.h"
+#include <vnxvideo/vnxvideo.h>
+#include <vnxvideo/vnxvideoimpl.h>
+#include <vnxvideo/vnxvideologimpl.h>
 
 using namespace std::placeholders;
 

@@ -2,9 +2,10 @@
 #include <functional>
 #include <fstream>
 #include <cstdlib>
-#include "../vnxvideo.h"
 
-#include "../vnxvideoimpl.h"
+#include <vnxvideo/vnxvideo.h>
+#include <vnxvideo/vnxvideoimpl.h>
+#include <vnxvideo/vnxvideologimpl.h>
 
 using namespace std::placeholders;
 
@@ -33,7 +34,10 @@ private:
     std::vector<VnxVideo::IRawProc*> m_processors;
 };
 
-extern "C" __declspec(dllimport) int create_geutebrueck_live_source(const char* json_config, vnxvideo_h264_source_t* source);
+//extern "C" __declspec(dllimport) 
+int create_geutebrueck_live_source(const char* json_config, vnxvideo_h264_source_t* source) {
+    return -1;
+}
 
 int on_handle_data(void* opaque, vnxvideo_buffer_t buffer, uint64_t ts) {
     std::cout << ts << std::endl;

@@ -108,7 +108,7 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_connections.insert(conn);
 
-        boost::asio::windows::overlapped_ptr op(conn->pipe.get_io_service(), 
+        boost::asio::windows::overlapped_ptr op(m_ios, 
             boost::bind(&CLocalVideoProvider::acceptHandler, this, conn, _1, _2));
         BOOL ok = ConnectNamedPipe(conn->pipe.native_handle(), op.get());
         int err = GetLastError();

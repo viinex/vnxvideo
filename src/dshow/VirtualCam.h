@@ -2,7 +2,7 @@
 
 #include <mutex>
 
-#include "../vnxvideoimpl.h"
+#include <vnxvideo/vnxvideoimpl.h>
 
 #define VIRTUALCAM_NAME "Viinex Virtual Camera"
 #define VIRTUALCAM_NAMEW L"Viinex Virtual Camera"
