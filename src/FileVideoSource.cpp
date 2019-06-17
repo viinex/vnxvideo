@@ -126,7 +126,7 @@ private:
             while (m_running) {
                 memset(&p, 0, sizeof p);
                 if (0 == av_read_frame(m_ctx.get(), &p)) {
-                    uint64_t ts = (p.dts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.dts*time_base.num * 1000 / time_base.den);
+                    uint64_t ts = (p.pts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.pts*time_base.num * 1000 / time_base.den);
                     uint64_t diffTimeMilliseconds = ts - m_prevTs;
                     if (m_prevTs > 0 && diffTimeMilliseconds > 10 && diffTimeMilliseconds<1000) {
                         m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
