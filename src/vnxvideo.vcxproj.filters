@@ -72,6 +72,9 @@
     <ClCompile Include="AnalyticsBasic.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FileVideoSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RawSample.h">
