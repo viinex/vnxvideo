@@ -20,9 +20,9 @@ else
 	IPPLIBS = -l:libippcc.a -l:libippcv.a -l:libippi.a -l:libipps.a -l:libippcore.a
 endif
 
-CXXFLAGS += -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(WELS_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
+CXXFLAGS += -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
 
-LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(WELS_HOME)/lib -L$(IPP_HOME)/lib/intel64
+LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib/intel64
 
 LDLIBS = -l:libopenh264.a -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread -lz -ldl -lrt -lswresample -l:libboost_system.a
 

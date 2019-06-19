@@ -269,8 +269,8 @@ private:
 
     std::shared_ptr<AVFormatContext> m_ctx;
     int m_stream; // index of the appropriate stream in the file
-    std::vector<uint8_t> m_sps; // hold SPS and PPS separated with 
-    std::vector<uint8_t> m_pps; // hold SPS and PPS separated with 
+    std::vector<uint8_t> m_sps;
+    std::vector<uint8_t> m_pps;
     uint64_t m_prevTs;
 };
 
