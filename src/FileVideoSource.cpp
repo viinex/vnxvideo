@@ -31,6 +31,7 @@ using json = nlohmann::json;
 
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <codecvt>
 
 extern "C" {
@@ -137,12 +138,15 @@ private:
                     lock.unlock();
                     try {
                         if (p.flags & AV_PKT_FLAG_KEY) {
-                            onBuffer(&CNoOwnershipNalBuffer(&m_sps[0], m_sps.size()), ts);
-                            onBuffer(&CNoOwnershipNalBuffer(&m_pps[0], m_pps.size()), ts);
+                            CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
+                            onBuffer(&sps, ts);
+                            CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
+                            onBuffer(&pps, ts);
                         }
                         // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
                         // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
-                        onBuffer(&CNoOwnershipNalBuffer(p.data+4, p.size-4), ts);
+                        CNoOwnershipNalBuffer data(p.data+4, p.size-4);
+                        onBuffer(&data, ts);
                     }
                     catch (const std::exception& e) {
                         VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer callback: " 
@@ -270,7 +274,7 @@ private:
     uint64_t m_prevTs;
 };
 
-extern "C" __declspec(dllexport) 
+extern "C" VNXVIDEO_DECLSPEC
 int create_media_file_live_source(const char* json_config, vnxvideo_h264_source_t* source) {
     try {
         json j;
