@@ -140,9 +140,16 @@ private:
                             onBuffer(&CNoOwnershipNalBuffer(&m_sps[0], m_sps.size()), ts);
                             onBuffer(&CNoOwnershipNalBuffer(&m_pps[0], m_pps.size()), ts);
                         }
-                        // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
-                        // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
-                        onBuffer(&CNoOwnershipNalBuffer(p.data+4, p.size-4), ts);
+                        int pos = 0;
+                        while (pos < p.size) {
+                            // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
+                            // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
+                            int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
+                            if (1 == len)
+                                len = p.size - 4;
+                            onBuffer(&CNoOwnershipNalBuffer(p.data + pos + 4, len), ts);
+                            pos += len + 4;
+                        }
                     }
                     catch (const std::exception& e) {
                         VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer callback: " 
