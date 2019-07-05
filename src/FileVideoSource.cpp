@@ -31,6 +31,7 @@ using json = nlohmann::json;
 
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <codecvt>
 
 extern "C" {
@@ -148,8 +149,10 @@ private:
                     lock.unlock();
                     try {
                         if (p.flags & AV_PKT_FLAG_KEY) {
-                            onBuffer(&CNoOwnershipNalBuffer(&m_sps[0], m_sps.size()), ts);
-                            onBuffer(&CNoOwnershipNalBuffer(&m_pps[0], m_pps.size()), ts);
+                            CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
+                            onBuffer(&sps, ts);
+                            CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
+                            onBuffer(&pps, ts);
                         }
                         int pos = 0;
                         while (pos < p.size) {
@@ -158,7 +161,8 @@ private:
                             int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
                             if (1 == len)
                                 len = p.size - 4;
-                            onBuffer(&CNoOwnershipNalBuffer(p.data + pos + 4, len), ts);
+                            CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                            onBuffer(&nalu, ts);
                             pos += len + 4;
                         }
                     }
@@ -283,13 +287,13 @@ private:
 
     std::shared_ptr<AVFormatContext> m_ctx;
     int m_stream; // index of the appropriate stream in the file
-    std::vector<uint8_t> m_sps; // hold SPS and PPS separated with 
-    std::vector<uint8_t> m_pps; // hold SPS and PPS separated with 
+    std::vector<uint8_t> m_sps;
+    std::vector<uint8_t> m_pps;
     uint64_t m_prevTs;
     uint64_t m_tsDiff;
 };
 
-extern "C" __declspec(dllexport) 
+extern "C" VNXVIDEO_DECLSPEC
 int create_media_file_live_source(const char* json_config, vnxvideo_h264_source_t* source) {
     try {
         json j;
