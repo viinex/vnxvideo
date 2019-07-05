@@ -130,6 +130,11 @@ private:
                     uint64_t diffTimeMilliseconds = ts - m_prevTs;
                     if (m_prevTs > 0){
                         if (diffTimeMilliseconds > 10 && diffTimeMilliseconds < 1000) {
+                            uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                            if (now > ts)
+                                diffTimeMilliseconds = 10;
+                            else
+                                diffTimeMilliseconds = std::min(diffTimeMilliseconds, ts - now);
                             m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
                         }
                         else {
@@ -163,7 +168,6 @@ private:
                     }
                     lock.lock();
                     av_packet_unref(&p);
-                    VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << ts << '\t' << ts - m_prevTs;
                     m_prevTs = ts;
                 }
                 else {
