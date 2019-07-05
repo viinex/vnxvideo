@@ -43,6 +43,7 @@ public:
         : m_running(false)
         , m_onBuffer([](VnxVideo::IBuffer*, uint64_t) {})
         , m_stream(-1)
+        , m_tsDiff(0)
     {
         if (!mjget(config, "file", m_filePath))
             throw std::runtime_error("mandatory `file' parameter is missing from config");
@@ -59,6 +60,7 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_running)
             throw std::runtime_error("CMediaFileLiveSource is already running");
+        m_prevTs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         m_running = true;
         m_thread = std::move(std::thread(&CMediaFileLiveSource::doRun, this));
     }
@@ -120,16 +122,20 @@ private:
                     continue;
                 }
             }
-            else
-                m_prevTs = 0;
             AVPacket p;
             while (m_running) {
                 memset(&p, 0, sizeof p);
                 if (0 == av_read_frame(m_ctx.get(), &p)) {
-                    uint64_t ts = (p.pts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.pts*time_base.num * 1000 / time_base.den);
+                    uint64_t ts = m_tsDiff + (p.pts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.pts*time_base.num * 1000 / time_base.den);
                     uint64_t diffTimeMilliseconds = ts - m_prevTs;
-                    if (m_prevTs > 0 && diffTimeMilliseconds > 10 && diffTimeMilliseconds<1000) {
-                        m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
+                    if (m_prevTs > 0){
+                        if (diffTimeMilliseconds > 10 && diffTimeMilliseconds < 1000) {
+                            m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
+                        }
+                        else {
+                            m_tsDiff = m_prevTs + 40 - ts;
+                            ts = m_prevTs + 40;
+                        }
                     }
                     if (!m_running)
                         break;
@@ -157,6 +163,7 @@ private:
                     }
                     lock.lock();
                     av_packet_unref(&p);
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << ts << '\t' << ts - m_prevTs;
                     m_prevTs = ts;
                 }
                 else {
@@ -275,6 +282,7 @@ private:
     std::vector<uint8_t> m_sps; // hold SPS and PPS separated with 
     std::vector<uint8_t> m_pps; // hold SPS and PPS separated with 
     uint64_t m_prevTs;
+    uint64_t m_tsDiff;
 };
 
 extern "C" __declspec(dllexport) 
