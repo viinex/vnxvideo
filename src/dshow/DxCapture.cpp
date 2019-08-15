@@ -74,7 +74,7 @@ private:
 
     int m_nplanes;
     int m_strides[4];
-    int m_offsets[4];
+    ptrdiff_t m_offsets[4];
 public:
     CDxRawSample(EColorspace csp, int width, int height, EColorspace cspOrig, int bppOrig, IMediaSample* sample, PShmAllocator allocator)
         :m_csp(csp)

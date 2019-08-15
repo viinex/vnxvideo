@@ -250,7 +250,7 @@ private:
         m_hwnd = CreateWindowW(WINDOW_CLASS_NAME,
             m_caption.c_str(),
             WS_OVERLAPPEDWINDOW, 100, 100, 100 + windowWidth, 100 + windowHeight, 0, 0, 0, 0);
-        SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, (LONG)this);
+        SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, (LONG_PTR)this);
 
         HRESULT hr = m_ddraw->SetCooperativeLevel(m_hwnd, DDSCL_NORMAL);
         if (FAILED(hr))

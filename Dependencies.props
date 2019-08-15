@@ -3,7 +3,7 @@
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
     <IPP_HOME>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries\windows\ipp</IPP_HOME>
-    <FFMPEG_HOME>C:\sdk\x86.vs8\ffmpeg-3.3.3-i686-w64-mingw32</FFMPEG_HOME>
+    <FFMPEG_HOME>C:\sdk\ffmpeg-3.3.3-i686-w64-mingw32</FFMPEG_HOME>
     <IDS_UEYE_HOME>C:\sdk\IDS-uEye</IDS_UEYE_HOME>
     <OPENH264_HOME>C:\sdk\openh264</OPENH264_HOME>
     <AMBASE_HOME>C:\sdk\ambase</AMBASE_HOME>

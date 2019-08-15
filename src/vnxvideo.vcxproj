@@ -62,11 +62,11 @@
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Dependencies.props" />
+    <Import Project="..\Dependencies_x64.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="..\Dependencies.props" />
+    <Import Project="..\Dependencies_x64.props" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -110,10 +110,13 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;_USRDLL;VNXVIDEO_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AMBASE_HOME);$(IPP_HOME)\include;$(IDS_UEYE_HOME)\Develop\include;$(FFMPEG_HOME)\include;$(OPENH264_HOME)\include;$(ProjectDir)..\include\vnxvideo;$(ProjectDir)..\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AMBASE_HOME)\x64\$(Configuration);$(IPP_HOME)\lib\intel64;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -147,12 +150,15 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;_USRDLL;VNXVIDEO_EXPORTS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(AMBASE_HOME);$(IPP_HOME)\include;$(IDS_UEYE_HOME)\Develop\include;$(FFMPEG_HOME)\include;$(OPENH264_HOME)\include;$(ProjectDir)..\include\vnxvideo;$(ProjectDir)..\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AMBASE_HOME)\x64\$(Configuration);$(IPP_HOME)\lib\intel64;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
