@@ -86,3 +86,15 @@ int vnxvideo_raw_sample_select_roi(vnxvideo_raw_sample_t in,
         return vnxvideo_err_invalid_parameter;
     }
 }
+
+namespace VnxVideo {
+    IRawSample* CopyRawToI420(IRawSample* sample) {
+        int strides[4];
+        uint8_t* planes[4];
+        int width, height;
+        EColorspace csp;
+        sample->GetFormat(csp, width, height);
+        sample->GetData(strides, planes);
+        return new CRawSample(csp, width, height, strides, planes, true);
+    }
+}

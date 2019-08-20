@@ -28,6 +28,8 @@ namespace VnxVideo
     };
     typedef std::shared_ptr<IRawSample> PRawSample;
 
+    VNXVIDEO_DECLSPEC IRawSample* CopyRawToI420(IRawSample*);
+
     typedef typename std::function<void(EColorspace csp, int width, int height)> TOnFormatCallback;
     typedef typename std::function<void(IRawSample*, uint64_t)> TOnFrameCallback;
     typedef typename std::function<void(IBuffer*, uint64_t)> TOnBufferCallback;
