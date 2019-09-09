@@ -184,6 +184,8 @@ extern "C" {
     typedef int (*vnxvideo_h264_source_create_t)(const char* json_config, vnxvideo_h264_source_t* source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_subscribe(vnxvideo_h264_source_t source,
         vnxvideo_on_buffer_t handle_data, void* usrptr); // each data buffer is a NAL unit
+    VNXVIDEO_DECLSPEC int vnxvideo_h264_source_events_subscribe(vnxvideo_h264_source_t source,
+        vnxvideo_on_json_t handle_event, void* usrptr); // each buffer is JSON value
     VNXVIDEO_DECLSPEC void vnxvideo_h264_source_free(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_start(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_stop(vnxvideo_h264_source_t source);

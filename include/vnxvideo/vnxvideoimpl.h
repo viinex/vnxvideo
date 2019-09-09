@@ -97,6 +97,7 @@ namespace VnxVideo
         virtual void Subscribe(TOnBufferCallback onBuffer) = 0;
         virtual void Run() = 0;
         virtual void Stop() = 0;
+        virtual void Subscribe(TOnJsonCallback onJson) {}
     };
     // created by factory functions exposed from plugins
 

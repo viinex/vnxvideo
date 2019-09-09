@@ -368,6 +368,23 @@ int vnxvideo_h264_source_subscribe(vnxvideo_h264_source_t source,
         return vnxvideo_err_invalid_parameter;
     }
 }
+int vnxvideo_h264_source_events_subscribe(vnxvideo_h264_source_t source,
+    vnxvideo_on_json_t handle_event, void* usrptr) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IH264VideoSource*>(source.ptr);
+        if (handle_event != nullptr)
+            s->Subscribe([=](const std::string& json, uint64_t ts) { 
+                handle_event(usrptr, json.c_str(), json.size(), ts);
+            });
+        else
+            s->Subscribe([](const std::string&, uint64_t) {});
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_source_events_subscribe: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
 void vnxvideo_h264_source_free(vnxvideo_h264_source_t source) {
     auto s = reinterpret_cast<VnxVideo::IH264VideoSource*>(source.ptr);
     delete s;

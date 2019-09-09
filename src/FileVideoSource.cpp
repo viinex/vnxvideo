@@ -19,6 +19,15 @@
 //      }
 //  }
 
+// This plugin implementation does not work very well with video files containing
+// b-frames. So you might need to encode your video files into H264 baseline profile
+// using the command like:
+// ffmpeg.exe -i INPUT.AVI -f mp4 -vcodec libx264 -preset fast -profile:v baseline OUTPUT.MP4
+
+// In order to produce an MP4 file containing the subtitles track, so that the plugin
+// would produce the subtitles as Viinex events synchronized with video, use:
+// ffmpeg.exe -i INPUT.avi -i INPUT.srt -f mp4 -vcodec libx264 -preset fast -profile:v baseline -c:s mov_text OUTPUT.mp4
+
 #include <vnxvideo/vnxvideo.h>
 #include <vnxvideo/vnxvideoimpl.h>
 #include <vnxvideo/vnxvideologimpl.h>
@@ -43,7 +52,9 @@ public:
     CMediaFileLiveSource(const json& config)
         : m_running(false)
         , m_onBuffer([](VnxVideo::IBuffer*, uint64_t) {})
+        , m_onJson([](const std::string&, uint64_t) {})
         , m_stream(-1)
+        , m_streamText(-1)
         , m_tsDiff(0)
     {
         if (!mjget(config, "file", m_filePath))
@@ -56,6 +67,10 @@ public:
     virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_onBuffer = onBuffer;
+    }
+    virtual void Subscribe(VnxVideo::TOnJsonCallback onJson) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        m_onJson = onJson;
     }
     virtual void Run() {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -94,6 +109,10 @@ private:
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is H264 video of resolution "
                     << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
             }
+            else if (AV_CODEC_ID_MOV_TEXT == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_streamText)) {
+                m_streamText = k;
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is a MOV_TEXT (subtitles) stream";
+            }
             else
                 m_ctx->streams[k]->discard = AVDISCARD_ALL;
         }
@@ -127,6 +146,22 @@ private:
             while (m_running) {
                 memset(&p, 0, sizeof p);
                 if (0 == av_read_frame(m_ctx.get(), &p)) {
+                    if (p.stream_index == m_streamText) {
+                        if (p.size >= 2) {
+                            int len = int(p.data[0])*256+int(p.data[1]);
+                            if (p.size == 2 + len) {
+                                std::string text(p.data + 2, p.data + 2 + len);
+                                json j;
+                                j["text"] = text;
+                                std::stringstream ss;
+                                ss << j;
+                                m_onJson(ss.str(), m_prevTs);
+                                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Timestamp: " << m_prevTs << ", text: " << text;
+                            }
+                        }
+                        av_packet_unref(&p);
+                        continue;
+                    }
                     uint64_t ts = m_tsDiff + (p.pts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.pts*time_base.num * 1000 / time_base.den);
                     uint64_t diffTimeMilliseconds = ts - m_prevTs;
                     if (m_prevTs > 0){
@@ -283,10 +318,12 @@ private:
     std::condition_variable m_condition;
     
     VnxVideo::TOnBufferCallback m_onBuffer;
+    VnxVideo::TOnJsonCallback m_onJson;
     bool m_running;
 
     std::shared_ptr<AVFormatContext> m_ctx;
-    int m_stream; // index of the appropriate stream in the file
+    int m_stream; // index of the appropriate video stream in the file
+    int m_streamText; // index of appropriate text stream in the file
     std::vector<uint8_t> m_sps;
     std::vector<uint8_t> m_pps;
     uint64_t m_prevTs;
