@@ -59,6 +59,8 @@ public:
     {
         if (!mjget(config, "file", m_filePath))
             throw std::runtime_error("mandatory `file' parameter is missing from config");
+        m_loop = jget(config, "loop", true);
+        m_speed = jget(config, "speed", 1.0);
 
         static int avregistered = avregister();
 
@@ -156,7 +158,7 @@ private:
                                 std::stringstream ss;
                                 ss << j;
                                 m_onJson(ss.str(), m_prevTs);
-                                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Timestamp: " << m_prevTs << ", text: " << text;
+                                //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Timestamp: " << m_prevTs << ", text: " << text;
                             }
                         }
                         av_packet_unref(&p);
@@ -171,7 +173,8 @@ private:
                                 diffTimeMilliseconds = 10;
                             else
                                 diffTimeMilliseconds = std::min(diffTimeMilliseconds, ts - now);
-                            m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
+                            if(m_speed != 0)
+                                m_condition.wait_for(lock, std::chrono::milliseconds((long long)round(diffTimeMilliseconds / m_speed)));
                         }
                         else {
                             m_tsDiff = m_prevTs + 40 - ts;
@@ -212,6 +215,22 @@ private:
                 else {
                     break;
                 }
+            }
+            if (!m_loop) {
+                auto onBuffer = m_onBuffer;
+                lock.unlock();
+                try {
+                    static uint8_t endOfStreamNal[] = { 11 };
+                    CNoOwnershipNalBuffer nalu(endOfStreamNal, 1);
+                    m_onBuffer(&nalu, m_prevTs);
+                }
+                catch (const std::exception& e) {
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer final callback: "
+                        << e.what();
+                }
+                lock.lock();
+                m_running = false;
+                break;
             }
         }
     }
@@ -312,6 +331,8 @@ private:
     }
 private:
     std::string m_filePath;
+    bool m_loop;
+    double m_speed;
 
     std::mutex m_mutex;
     std::thread m_thread;
