@@ -228,8 +228,6 @@ private:
                     VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer final callback: "
                         << e.what();
                 }
-                lock.lock();
-                m_running = false;
                 break;
             }
         }
