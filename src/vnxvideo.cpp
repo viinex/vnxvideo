@@ -2,6 +2,7 @@
 #include <vector>
 #include <sstream>
 #include <codecvt>
+#include <locale>
 #include "json.hpp"
 #include "jget.h"
 #include <ipp.h>
