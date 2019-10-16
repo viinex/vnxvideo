@@ -21,7 +21,6 @@ int main(int argc, char** argv) {
         std::string origin("rend0");
         if (argc >= 2)
             origin = argv[1];
-
         VnxVideo::PRawProc disp;
         VnxVideo::PVideoSource lsrc;
         
@@ -45,7 +44,6 @@ int main(int argc, char** argv) {
 
         lsrc->Run();
 
-
         std::string s;
         std::cout << "Close display window to quit" << std::endl;
 
@@ -57,7 +55,8 @@ int main(int argc, char** argv) {
         return 0;
     }
     catch (const std::exception& e) {
-
+        std::cerr << "Caught an exception: " << e.what() << std::endl;
+        return 1;
     }
 }
 

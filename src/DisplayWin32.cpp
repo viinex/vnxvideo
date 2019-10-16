@@ -32,6 +32,12 @@ CHelper& helper() {
     return helper;
 }
 
+void checkHRESULT(HRESULT hr, const char* message) {
+    std::stringstream ss;
+    ss << message << ", HRESULT=" << std::hex << hr;
+    if (FAILED(hr))
+        throw std::runtime_error(ss.str().c_str());
+}
 
 class CDisplaySink: public VnxVideo::IRawProc
 {
@@ -44,8 +50,7 @@ private:
         ddsd.dwFlags = DDSD_CAPS;
         ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
         HRESULT hr = m_ddraw->CreateSurface(&ddsd, &m_surfPrimary, 0);
-        if (FAILED(hr))
-            throw std::runtime_error("could not create primary surface");
+        checkHRESULT(hr, "could not create primary surface");
     }
     void createOverlaySurface(int width, int height)
     {
@@ -55,7 +60,7 @@ private:
         ddsd.dwWidth = width;
         ddsd.dwHeight = height;
         ddsd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
-        ddsd.ddsCaps.dwCaps = DDSCAPS_VIDEOMEMORY | DDSCAPS_OVERLAY;
+        //ddsd.ddsCaps.dwCaps = DDSCAPS_VIDEOMEMORY | DDSCAPS_OVERLAY;
         ddsd.ddpfPixelFormat.dwSize = sizeof ddsd.ddpfPixelFormat;
         ddsd.ddpfPixelFormat.dwFlags = DDPF_FOURCC;
 
@@ -65,8 +70,7 @@ private:
         ddsd.ddpfPixelFormat.dwFourCC = mmioFOURCC('Y', 'V', '1', '2');
 
         HRESULT hr = m_ddraw->CreateSurface(&ddsd, &m_surfOverlay, 0);
-        if (FAILED(hr))
-            throw std::runtime_error("could not create overlay surface");
+        checkHRESULT(hr, "could not create overlay surface");
     }
 public:
     CDisplaySink(int width, int height, const char* caption, std::function<void(void)> onClose)
@@ -84,8 +88,7 @@ public:
             throw std::runtime_error("could not get the address of DirectDrawCreate function in ddraw.dll");
         HRESULT hr;
         hr = helper().DirectDrawCreate(0, &m_ddraw, 0);
-        if (FAILED(hr))
-            throw std::runtime_error("could not DirectDrawCreate()");
+        checkHRESULT(hr, "could not DirectDrawCreate()");
 
         std::unique_lock<std::mutex> lock(m_mutex);
         m_continue = true;
@@ -253,8 +256,7 @@ private:
         SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, (LONG_PTR)this);
 
         HRESULT hr = m_ddraw->SetCooperativeLevel(m_hwnd, DDSCL_NORMAL);
-        if (FAILED(hr))
-            throw std::runtime_error("could not SetCooperativeLevel()");
+        checkHRESULT(hr, "could not SetCooperativeLevel()");
 
         m_condition.notify_all();
 
@@ -267,8 +269,7 @@ private:
         createOverlaySurface(m_width, m_height);
 
         HRESULT hr = m_ddraw->CreateClipper(0, &m_clipper, 0);
-        if (FAILED(hr))
-            throw std::runtime_error("could not CreateClipper()");
+        checkHRESULT(hr, "could not CreateClipper()");
         m_clipper->SetHWnd(0, m_hwnd);
         m_surfPrimary->SetClipper(m_clipper);
     }
