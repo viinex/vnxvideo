@@ -110,6 +110,7 @@ public:
         , m_csp(EMF_NONE)
         , m_formatInvalidated(true)
         , m_sizeInvalidated(true)
+        , m_surfacesLost(false)
         , m_onClose(onClose)
     {
         if(!helper().DirectDrawCreate)
@@ -164,6 +165,8 @@ private:
 
     bool m_sizeInvalidated; // viewport size was changed.
 
+    bool m_surfacesLost;
+
     VnxVideo::PRawSample m_sample;
 
     std::function<void(void)> m_onClose;
@@ -172,12 +175,39 @@ private:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sizeInvalidated = true;
     }
+    bool restoreSurfaces(std::unique_lock<std::mutex>& lock) {
+        if (!lock)
+            throw std::logic_error("lock should be acquired in restoreSurfaces");
+        if (!m_surfacesLost)
+            return true;
+        auto primary(m_surfPrimary);
+        auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
+        if (!primary || !backbuffer)
+            return false;
+        lock.unlock();
+        HRESULT hr;
+        hr=primary->Restore();
+        if (FAILED(hr))
+            return false;
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Primary surface restored";
+        hr = backbuffer->Restore();
+        if (FAILED(hr))
+            return false;
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Backbuffer surface restored";
+        lock.lock();
+        m_surfacesLost = false;
+        return true;
+    }
     void onPaint() {
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_formatInvalidated && m_csp != EMF_NONE) {
             createSurfaces(lock);
             m_formatInvalidated = false;
         }
+
+        if (m_surfacesLost)
+            if (!restoreSurfaces(lock))
+                return;
 
         RECT cr;
         GetClientRect(m_hwnd, &cr);
@@ -219,8 +249,9 @@ private:
         auto primary(m_surfPrimary);
         auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
 
-        updateBackbufferSurface(lock); // lock is unlocked after that
-        if (primary && backbuffer) {
+        bool blit=updateBackbufferSurface(lock);
+            
+        if (primary && backbuffer && blit) {
             if (clearBackground) {
                 // color fill clear by means of GDI
                 // because the priomary->Blt with color fill flags causes an access violation.
@@ -232,26 +263,40 @@ private:
                 ReleaseDC(m_hwnd, hdc);
             }
 
-            primary->Blt(&vp, backbuffer, 0, DDBLT_WAIT, 0);
+            HRESULT hr=primary->Blt(&vp, backbuffer, 0, DDBLT_WAIT, 0);
+            if (FAILED(hr)) {
+                if (hr == DDERR_SURFACELOST) {
+                    lock.lock();
+                    m_surfacesLost = true;
+                    VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "DDERR_SURFACELOST on attempt to Blt to primary surface";
+                }
+                else
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "displaywin32") << "Could not Blt to primary surface: HRESULT=" << std::hex << hr;
+            }
         }
         //or primary->Flip(backbuffer, DDFLIP_WAIT); // this is for the fullscreen
     }
     void onClose() {
         m_onClose();
     }
-    void updateBackbufferSurface(std::unique_lock<std::mutex>& lock) {
+    bool updateBackbufferSurface(std::unique_lock<std::mutex>& lock) {
         if (!lock.owns_lock())
             throw std::logic_error("lock should be acquired");
+
+        if (m_surfacesLost)
+            if (!restoreSurfaces(lock))
+                return false;
+
         VnxVideo::PRawSample sample(m_sample);
         auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
         bool yuv = !!m_surfBackbufferYUV;
         auto csp(m_csp);
         auto width(m_width);
         auto height(m_height);
-        lock.unlock();
         if (nullptr == sample.get() || !backbuffer)
-            return;
+            return false;
 
+        lock.unlock();
         DDSURFACEDESC ddsd;
         memset(&ddsd, 0, sizeof ddsd);
         ddsd.dwSize = sizeof ddsd;
@@ -279,6 +324,17 @@ private:
             }
 
             backbuffer->Unlock(ddsd.lpSurface);
+            return true;
+        }
+        else{
+            if (hr == DDERR_SURFACELOST) {
+                lock.lock();
+                m_surfacesLost = true;
+                VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "DDERR_SURFACELOST on attempt to lock surface";
+            }
+            else
+                VNXVIDEO_LOG(VNXLOG_WARNING, "displaywin32") << "Could not lock surface: HRESULT=" << std::hex << hr;
+            return false;
         }
     }
 private:
@@ -342,7 +398,9 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
         HWND hwnd(m_hwnd);
-        updateBackbufferSurface(lock); // lock is unlocked after that
+        updateBackbufferSurface(lock);
+        if (lock.owns_lock())
+            lock.unlock();
         if(hwnd)
             PostMessage(hwnd, WM_PAINT, 0, (LPARAM)this);
     }
