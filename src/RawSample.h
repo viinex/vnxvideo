@@ -256,6 +256,16 @@ public:
             vnxippiBGR565ToYCbCr420_16u8u_C3P3R((unsigned short*)src[0], src_strides[0], dst, dst_strides, { roi.width, roi.height });
         }
     }
+    static void CopyI420ToRGB(int width, int height,
+        const uint8_t* const* src, int* src_strides,
+        int dst_bpp, uint8_t* dst, int dst_stride) {
+        if (dst_bpp == 32) {
+            ippiYCbCr420ToBGR_8u_P3C4R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height }, 0);
+        }
+        else if (dst_bpp == 24) {
+            ippiYCbCr420ToBGR_8u_P3C3R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height });
+        }
+    }
 };
 
 // A sample created from another sample by selecting a specific ROI. Shares same underlying memory with original sample.
