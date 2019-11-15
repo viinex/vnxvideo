@@ -398,7 +398,6 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
         HWND hwnd(m_hwnd);
-        updateBackbufferSurface(lock);
         if (lock.owns_lock())
             lock.unlock();
         if(hwnd)
