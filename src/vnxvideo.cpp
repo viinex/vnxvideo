@@ -36,11 +36,13 @@ int vnxvideo_init(vnxvideo_log_t log_handler, void* usrptr, ELogLevel max_level)
     NVnxVideoLogImpl::g_logUsrptr = usrptr;
     NVnxVideoLogImpl::g_maxLogLevel = max_level;
 
+#ifndef __aarch64__
     IppStatus ipps=ippInit();
     if (ipps != ippStsNoErr && ipps != ippStsNonIntelCpu) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Failed to initialize IPP libraries: " << ipps;
         return vnxvideo_err_external_api;
     }
+#endif
 
     vnxvideo_init_ffmpeg(max_level);
 
@@ -524,6 +526,7 @@ int vnxvideo_analytics_create(const char* json_config, vnxvideo_analytics_t* ana
             throw std::runtime_error("incorrect ROI specified");
         }
         float framerate(jget<float>(j, "framerate", 0));
+#ifndef __aarch64__
         if (type == "basic") {
             bool too_bright(jget<bool>(j, "too_bright"));
             bool too_dark(jget<bool>(j, "too_dark"));
@@ -533,6 +536,7 @@ int vnxvideo_analytics_create(const char* json_config, vnxvideo_analytics_t* ana
             analytics->ptr = VnxVideo::CreateAnalytics_Basic(roi, framerate, too_bright, too_dark, too_blurry, motion, scene_change);
         }
         else
+#endif
             throw std::runtime_error("unknown analytics type: " + type);
     }
     catch (const std::exception& e) {
@@ -573,7 +577,11 @@ int vnxvideo_rawtransform_create(const char* json_config, vnxvideo_rawtransform_
         std::string s(json_config);
         std::stringstream ss(s);
         ss >> j;
+#ifndef __aarch64__
         transform->ptr = VnxVideo::CreateRawTransform(j);
+#else
+	throw std::runtime_error("Raw transforms not implemented on aarch64");
+#endif
         return 0;
     }
     catch (const std::exception& e) {
@@ -662,7 +670,11 @@ VNXVIDEO_DECLSPEC int vnxvideo_renderer_create_input(vnxvideo_renderer_t rendere
             std::string s(transform_json);
             std::stringstream ss(s);
             ss >> j;
-            transform.reset(VnxVideo::CreateRawTransform(j));
+#ifndef __aarch64__
+	    transform.reset(VnxVideo::CreateRawTransform(j));
+#else
+	    throw std::runtime_error("Raw transforms not supported on aarch64");
+#endif
         }
         input->ptr = r->CreateInput(index, transform);
         return vnxvideo_err_ok;
