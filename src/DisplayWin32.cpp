@@ -263,7 +263,14 @@ private:
                 ReleaseDC(m_hwnd, hdc);
             }
 
-            HRESULT hr=primary->Blt(&vp, backbuffer, 0, DDBLT_WAIT, 0);
+            HRESULT hr;
+            if ((hr=primary->IsLost()) != DD_OK) {
+                lock.lock();
+                m_surfacesLost = true;
+                VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "IsLost returned non-success on primary surface, hr = " << std::hex << hr;
+                return;
+            }
+            hr = primary->Blt(&vp, backbuffer, 0, DDBLT_WAIT, 0);
             if (FAILED(hr)) {
                 if (hr == DDERR_SURFACELOST) {
                     lock.lock();
@@ -304,6 +311,12 @@ private:
         int srcStrides[4];
         uint8_t* srcPlanes[4];
         sample->GetData(srcStrides, srcPlanes);
+        if ((hr=backbuffer->IsLost()) != DD_OK) {
+            lock.lock();
+            m_surfacesLost = true;
+            VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "IsLost returned non-success on backbuffer, hr=" << std::hex << hr;
+            return false;
+        }
         hr = backbuffer->Lock(0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, 0);
         if (SUCCEEDED(hr))
         {
