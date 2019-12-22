@@ -177,6 +177,8 @@
     <ClCompile Include="FileVideoSource.cpp" />
     <ClCompile Include="ippimpl.cpp" />
     <ClCompile Include="LocalTransport.cpp" />
+    <ClCompile Include="openh264Common.cpp" />
+    <ClCompile Include="openh264DecoderImpl.cpp" />
     <ClCompile Include="openh264EncoderImpl.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="vnxvideo.cpp" />
@@ -190,6 +192,7 @@
     <ClInclude Include="..\include\vnxvideo\vnxvideologimpl.h" />
     <ClInclude Include="dshow\VirtualCam.h" />
     <ClInclude Include="GrayAnalyticsBase.h" />
+    <ClInclude Include="openh264Common.h" />
     <ClInclude Include="RawSample.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="vnxipp.h" />

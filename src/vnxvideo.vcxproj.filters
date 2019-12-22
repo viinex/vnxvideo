@@ -75,6 +75,12 @@
     <ClCompile Include="FileVideoSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="openh264DecoderImpl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="openh264Common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RawSample.h">
@@ -109,6 +115,9 @@
     </ClInclude>
     <ClInclude Include="..\include\vnxvideo\vnxvideologimpl.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="openh264Common.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

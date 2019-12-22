@@ -70,7 +70,7 @@ namespace VnxVideo
     typedef std::shared_ptr<IVideoDecoder> PVideoDecoder;
 
     VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_FFmpegH264();
-
+    VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_OpenH264();
 
     class IRawProc {
     public:
