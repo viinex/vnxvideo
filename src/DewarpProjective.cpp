@@ -1,3 +1,4 @@
+#ifndef __aarch64__
 #include <boost/lexical_cast.hpp>
 #include <ippi.h>
 #include <ipp.h>
@@ -155,3 +156,4 @@ namespace VnxVideo {
             throw std::runtime_error("unknown raw video transform type: " + type);
     }
 }
+#endif // aarch64
