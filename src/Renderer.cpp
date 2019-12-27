@@ -416,9 +416,9 @@ private:
             };
             srcRoi.x = (srcRoi.x / RoundSizeX) * RoundSizeX;
             srcRoi.y = (srcRoi.y / RoundSizeY) * RoundSizeY;
-            srcRoi.width = std::min(srcRoi.width, width - srcRoi.x);
+            srcRoi.width = std::min(srcRoi.width, w - srcRoi.x);
             srcRoi.width = (srcRoi.width / RoundSizeX) * RoundSizeX;
-            srcRoi.height = std::min(srcRoi.height, height - srcRoi.y);
+            srcRoi.height = std::min(srcRoi.height, h - srcRoi.y);
             if (srcRoi.width < RoundSizeX || srcRoi.height < RoundSizeY)
                 continue;
 
