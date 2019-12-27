@@ -22,18 +22,24 @@ public:
 
         int specSize;
         int bufSize;
+        int initSize;
         s=ippiWarpPerspectiveGetSize(m_size, ippRectInfinite, m_size, ipp8u, coeffs, ippCubic, ippWarpForward, ippBorderConst,
-            &specSize, &bufSize);
+            &specSize, &initSize);
         if (ippStsNoErr != s)
             throw std::runtime_error("ippiWarpPerspectiveGetSize failed, status = " + boost::lexical_cast<std::string>(s));
 
         m_spec.reset(reinterpret_cast<IppiWarpSpec*>(ippMalloc(specSize)), ippFree);
-        m_buf.reset(reinterpret_cast<Ipp8u*>(ippMalloc(bufSize)), ippFree);
+        std::shared_ptr<Ipp8u> initBuf(reinterpret_cast<Ipp8u*>(ippMalloc(initSize)), ippFree);
 
         s = ippiWarpPerspectiveCubicInit(m_size, ippRectInfinite, m_size, ipp8u, coeffs, ippWarpForward, 1, 0, 0,
-            ippBorderConst, &borderValue, 0, m_spec.get(), m_buf.get());
+            ippBorderConst, &borderValue, 0, m_spec.get(), initBuf.get());
         if (ippStsNoErr != s)
             throw std::runtime_error("ippiWarpPerspectiveCubicInit failed, status = " + boost::lexical_cast<std::string>(s));
+
+        s = ippiWarpGetBufferSize(m_spec.get(), m_size, &bufSize);
+        if (ippStsNoErr != s)
+            throw std::runtime_error("ippiWarpGetBufferSize failed, status = " + boost::lexical_cast<std::string>(s));
+        m_buf.reset(reinterpret_cast<Ipp8u*>(ippMalloc(bufSize)), ippFree);
     }
     void Apply(const Ipp8u* src, int srcStep, Ipp8u* dst, int dstStep) {
         IppStatus s=ippiWarpPerspectiveCubic_8u_C1R(src, srcStep, dst, dstStep, { 0,0 }, m_size, m_spec.get(), m_buf.get());
