@@ -256,9 +256,20 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_shutdown = true;
         for (auto p : m_connections) {
-            p->pipe.cancel();
-            p->pipe.close();
+            try {
+                p->pipe.cancel();
+                p->pipe.close();
+            }
+            catch(const std::exception&){
+            }
         }
+#ifndef _WIN32
+        try {
+            m_acceptor.cancel();
+        }
+        catch(const std::exception&){
+        }
+#endif
         lock.unlock();
         if(m_thread.get_id()!=std::thread().get_id())
             m_thread.join();
