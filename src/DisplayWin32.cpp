@@ -44,6 +44,8 @@ class CDisplaySink: public VnxVideo::IRawProc
 private:
     void createPrimarySurface()
     {
+        if (m_surfPrimary != nullptr)
+            return;
         DDSURFACEDESC ddsd;
         memset(&ddsd, 0, sizeof ddsd);
         ddsd.dwSize = sizeof ddsd;
@@ -51,16 +53,16 @@ private:
         ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
         HRESULT hr = m_ddraw->CreateSurface(&ddsd, &m_surfPrimary, 0);
         checkHRESULT(hr, "could not create primary surface");
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Primary surface created";
     }
-    void createOverlaySurface(int width, int height)
+    void createBackbufferSurface(int width, int height)
     {
         DDSURFACEDESC ddsd;
         memset(&ddsd, 0, sizeof ddsd);
         ddsd.dwSize = sizeof ddsd;
         ddsd.dwWidth = width;
         ddsd.dwHeight = height;
-        ddsd.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
-        //ddsd.ddsCaps.dwCaps = DDSCAPS_VIDEOMEMORY | DDSCAPS_OVERLAY;
+        ddsd.dwFlags = DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
         ddsd.ddpfPixelFormat.dwSize = sizeof ddsd.ddpfPixelFormat;
         ddsd.ddpfPixelFormat.dwFlags = DDPF_FOURCC;
 
@@ -69,26 +71,56 @@ private:
         ddsd.ddpfPixelFormat.dwYUVBitCount = 12;
         ddsd.ddpfPixelFormat.dwFourCC = mmioFOURCC('Y', 'V', '1', '2');
 
-        HRESULT hr = m_ddraw->CreateSurface(&ddsd, &m_surfOverlay, 0);
-        checkHRESULT(hr, "could not create overlay surface");
+        HRESULT hr = m_ddraw->CreateSurface(&ddsd, &m_surfBackbufferYUV, 0);
+
+        if (hr == DDERR_INVALIDPIXELFORMAT) {
+            VNXVIDEO_LOG(VNXLOG_WARNING, "displaywin32") << "Pixel format YV12 not supported for back buffer";
+            DDSURFACEDESC ddsd;
+            memset(&ddsd, 0, sizeof ddsd);
+            ddsd.dwSize = sizeof ddsd;
+            ddsd.dwWidth = width;
+            ddsd.dwHeight = height;
+            ddsd.dwFlags = DDSD_WIDTH | DDSD_HEIGHT;
+            hr = m_ddraw->CreateSurface(&ddsd, &m_surfBackbufferRGB, 0);
+
+            memset(&ddpfRGB, 0, sizeof ddpfRGB);
+            ddpfRGB.dwSize = sizeof ddpfRGB;
+            m_surfBackbufferRGB->GetPixelFormat(&ddpfRGB);
+        }
+
+        checkHRESULT(hr, "could not create backbuffer surface");
+
+        std::string format("unknown");
+        if (m_surfBackbufferYUV)
+            format = "YUV 4:2:0 planar";
+        else if (m_surfBackbufferRGB && ddpfRGB.dwFourCC==0) {
+            format = "RGB" + std::to_string(ddpfRGB.dwRGBBitCount);
+        }
+
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Backbuffer surface created, format " << format;
     }
 public:
     CDisplaySink(int width, int height, const char* caption, std::function<void(void)> onClose)
         : m_ddraw(0)
-        , m_surfOverlay(0)
+        , m_surfBackbufferYUV(0)
+        , m_surfBackbufferRGB(0)
         , m_surfPrimary(0)
         , m_hwnd(0)
         , m_caption(std::wstring_convert<std::codecvt_utf8<wchar_t>>().from_bytes(caption))
         , m_csp(EMF_NONE)
         , m_formatInvalidated(true)
         , m_sizeInvalidated(true)
+        , m_surfacesLost(false)
         , m_onClose(onClose)
     {
         if(!helper().DirectDrawCreate)
             throw std::runtime_error("could not get the address of DirectDrawCreate function in ddraw.dll");
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "DirectDrawCreate symbol found in ddraw.dll";
         HRESULT hr;
         hr = helper().DirectDrawCreate(0, &m_ddraw, 0);
         checkHRESULT(hr, "could not DirectDrawCreate()");
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "DirectDrawCreate() succeeded";
+
 
         std::unique_lock<std::mutex> lock(m_mutex);
         m_continue = true;
@@ -112,7 +144,10 @@ public:
 private:
     CComPtr<IDirectDraw> m_ddraw;
     CComPtr<IDirectDrawSurface> m_surfPrimary;
-    CComPtr<IDirectDrawSurface> m_surfOverlay;
+    CComPtr<IDirectDrawSurface> m_surfBackbufferYUV;
+    CComPtr<IDirectDrawSurface> m_surfBackbufferRGB;
+    DDPIXELFORMAT ddpfRGB;
+
     CComPtr<IDirectDrawClipper> m_clipper;
     HWND m_hwnd;
 
@@ -130,6 +165,8 @@ private:
 
     bool m_sizeInvalidated; // viewport size was changed.
 
+    bool m_surfacesLost;
+
     VnxVideo::PRawSample m_sample;
 
     std::function<void(void)> m_onClose;
@@ -138,12 +175,39 @@ private:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sizeInvalidated = true;
     }
+    bool restoreSurfaces(std::unique_lock<std::mutex>& lock) {
+        if (!lock)
+            throw std::logic_error("lock should be acquired in restoreSurfaces");
+        if (!m_surfacesLost)
+            return true;
+        auto primary(m_surfPrimary);
+        auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
+        if (!primary || !backbuffer)
+            return false;
+        lock.unlock();
+        HRESULT hr;
+        hr=primary->Restore();
+        if (FAILED(hr))
+            return false;
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Primary surface restored";
+        hr = backbuffer->Restore();
+        if (FAILED(hr))
+            return false;
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "Backbuffer surface restored";
+        lock.lock();
+        m_surfacesLost = false;
+        return true;
+    }
     void onPaint() {
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_formatInvalidated && m_csp != EMF_NONE) {
             createSurfaces(lock);
             m_formatInvalidated = false;
         }
+
+        if (m_surfacesLost)
+            if (!restoreSurfaces(lock))
+                return;
 
         RECT cr;
         GetClientRect(m_hwnd, &cr);
@@ -183,10 +247,11 @@ private:
         m_sizeInvalidated = false;
 
         auto primary(m_surfPrimary);
-        auto overlay(m_surfOverlay);
+        auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
 
-        updateOverlaySurface(lock); // lock is unlocked after that
-        if (primary && overlay) {
+        bool blit=updateBackbufferSurface(lock);
+            
+        if (primary && backbuffer && blit) {
             if (clearBackground) {
                 // color fill clear by means of GDI
                 // because the priomary->Blt with color fill flags causes an access violation.
@@ -198,25 +263,47 @@ private:
                 ReleaseDC(m_hwnd, hdc);
             }
 
-            primary->Blt(&vp, overlay, 0, DDBLT_WAIT, 0);
+            HRESULT hr;
+            if ((hr=primary->IsLost()) != DD_OK) {
+                lock.lock();
+                m_surfacesLost = true;
+                VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "IsLost returned non-success on primary surface, hr = " << std::hex << hr;
+                return;
+            }
+            hr = primary->Blt(&vp, backbuffer, 0, DDBLT_WAIT, 0);
+            if (FAILED(hr)) {
+                if (hr == DDERR_SURFACELOST) {
+                    lock.lock();
+                    m_surfacesLost = true;
+                    VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "DDERR_SURFACELOST on attempt to Blt to primary surface";
+                }
+                else
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "displaywin32") << "Could not Blt to primary surface: HRESULT=" << std::hex << hr;
+            }
         }
-        //or primary->Flip(overlay, DDFLIP_WAIT); // this is for the fullscreen
+        //or primary->Flip(backbuffer, DDFLIP_WAIT); // this is for the fullscreen
     }
     void onClose() {
         m_onClose();
     }
-    void updateOverlaySurface(std::unique_lock<std::mutex>& lock) {
+    bool updateBackbufferSurface(std::unique_lock<std::mutex>& lock) {
         if (!lock.owns_lock())
             throw std::logic_error("lock should be acquired");
+
+        if (m_surfacesLost)
+            if (!restoreSurfaces(lock))
+                return false;
+
         VnxVideo::PRawSample sample(m_sample);
-        auto overlay(m_surfOverlay);
+        auto backbuffer(m_surfBackbufferYUV ? m_surfBackbufferYUV : m_surfBackbufferRGB);
+        bool yuv = !!m_surfBackbufferYUV;
         auto csp(m_csp);
         auto width(m_width);
         auto height(m_height);
-        lock.unlock();
-        if (nullptr == sample.get() || !overlay)
-            return;
+        if (nullptr == sample.get() || !backbuffer)
+            return false;
 
+        lock.unlock();
         DDSURFACEDESC ddsd;
         memset(&ddsd, 0, sizeof ddsd);
         ddsd.dwSize = sizeof ddsd;
@@ -224,28 +311,55 @@ private:
         int srcStrides[4];
         uint8_t* srcPlanes[4];
         sample->GetData(srcStrides, srcPlanes);
-        hr = overlay->Lock(0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, 0);
+        if ((hr=backbuffer->IsLost()) != DD_OK) {
+            lock.lock();
+            m_surfacesLost = true;
+            VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "IsLost returned non-success on backbuffer, hr=" << std::hex << hr;
+            return false;
+        }
+        hr = backbuffer->Lock(0, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, 0);
         if (SUCCEEDED(hr))
         {
-            int dstStrides[4];
-            uint8_t* dstPlanes[4];
-            dstStrides[0] = ddsd.lPitch;
-            dstStrides[1] = ddsd.lPitch / 2;
-            dstStrides[2] = ddsd.lPitch / 2;
-            dstPlanes[0] = (uint8_t*)ddsd.lpSurface;
-            dstPlanes[2] = dstPlanes[0] + dstStrides[0] * ddsd.dwHeight;
-            dstPlanes[1] = dstPlanes[2] + dstStrides[2] * ddsd.dwHeight/2;
+            if (yuv) {
+                int dstStrides[4];
+                uint8_t* dstPlanes[4];
+                dstStrides[0] = ddsd.lPitch;
+                dstStrides[1] = ddsd.lPitch / 2;
+                dstStrides[2] = ddsd.lPitch / 2;
+                dstPlanes[0] = (uint8_t*)ddsd.lpSurface;
+                dstPlanes[2] = dstPlanes[0] + dstStrides[0] * ddsd.dwHeight;
+                dstPlanes[1] = dstPlanes[2] + dstStrides[2] * ddsd.dwHeight / 2;
 
-            CRawSample::CopyRawToI420(width, height, csp, srcPlanes, srcStrides, dstPlanes, dstStrides);
+                CRawSample::CopyRawToI420(width, height, csp, srcPlanes, srcStrides, dstPlanes, dstStrides);
+            }
+            else { // rgb
+                CRawSample::CopyI420ToRGB(width, height, srcPlanes, srcStrides, ddpfRGB.dwAlphaBitDepth, (uint8_t*)ddsd.lpSurface, ddsd.lPitch);
+            }
 
-            overlay->Unlock(ddsd.lpSurface);
+            backbuffer->Unlock(ddsd.lpSurface);
+            return true;
+        }
+        else{
+            if (hr == DDERR_SURFACELOST) {
+                lock.lock();
+                m_surfacesLost = true;
+                VNXVIDEO_LOG(VNXLOG_INFO, "displaywin32") << "DDERR_SURFACELOST on attempt to lock surface";
+            }
+            else
+                VNXVIDEO_LOG(VNXLOG_WARNING, "displaywin32") << "Could not lock surface: HRESULT=" << std::hex << hr;
+            return false;
         }
     }
 private:
     void run(int windowWidth, int windowHeight)
     {
-        createWindow(windowWidth, windowHeight);
-        messageLoop();
+        try {
+            createWindow(windowWidth, windowHeight);
+            messageLoop();
+        }
+        catch (const std::exception& e) {
+            VNXVIDEO_LOG(VNXLOG_ERROR, "displaywin32") << "Unhandled exception in display run loop: " << e.what();
+        }
     }
 
     void createWindow(int windowWidth, int windowHeight) {
@@ -257,6 +371,7 @@ private:
 
         HRESULT hr = m_ddraw->SetCooperativeLevel(m_hwnd, DDSCL_NORMAL);
         checkHRESULT(hr, "could not SetCooperativeLevel()");
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "displaywin32") << "SetCooperativeLevel() succeeded";
 
         m_condition.notify_all();
 
@@ -266,7 +381,7 @@ private:
 
     void createSurfaces(std::unique_lock<std::mutex>& lock){
         createPrimarySurface();
-        createOverlaySurface(m_width, m_height);
+        createBackbufferSurface(m_width, m_height);
 
         HRESULT hr = m_ddraw->CreateClipper(0, &m_clipper, 0);
         checkHRESULT(hr, "could not CreateClipper()");
@@ -296,7 +411,8 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
         HWND hwnd(m_hwnd);
-        updateOverlaySurface(lock); // lock is unlocked after that
+        if (lock.owns_lock())
+            lock.unlock();
         if(hwnd)
             PostMessage(hwnd, WM_PAINT, 0, (LPARAM)this);
     }
@@ -306,30 +422,36 @@ public:
 public:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
     {
-        switch (uMsg)
+        try
         {
-        case WM_CLOSE:
-        case WM_DESTROY: {
-            CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-            if (displaySink)
-                displaySink->onClose();
-            PostQuitMessage(0);
-            break;
+            switch (uMsg)
+            {
+            case WM_CLOSE:
+            case WM_DESTROY: {
+                CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                if (displaySink)
+                    displaySink->onClose();
+                PostQuitMessage(0);
+                break;
+            }
+            case WM_PAINT: {
+                CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                if (displaySink)
+                    displaySink->onPaint();
+                break;
+            }
+            case WM_SIZE:
+            case WM_MOVE:
+            case WM_MOVING: {
+                CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+                if (displaySink)
+                    displaySink->onWindowGeometry();
+                break;
+            }
+            }
         }
-        case WM_PAINT: {
-            CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-            if (displaySink)
-                displaySink->onPaint();
-            break;
-        }
-        case WM_SIZE:
-        case WM_MOVE:
-        case WM_MOVING: {
-            CDisplaySink* displaySink = reinterpret_cast<CDisplaySink*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-            if(displaySink)
-                displaySink->onWindowGeometry();
-            break;
-        }
+        catch (const std::exception& e) {
+            VNXVIDEO_LOG(VNXLOG_ERROR, "displaywin32") << "Unhandled exception in WindowProc: " << e.what();
         }
         return DefWindowProc(hwnd, uMsg, wParam, lParam);
     }

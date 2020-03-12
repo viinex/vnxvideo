@@ -1,3 +1,4 @@
+#ifndef __aarch64__
 #include <algorithm>
 #include <boost/lexical_cast.hpp>
 
@@ -387,3 +388,4 @@ namespace VnxVideo {
     }
 
 }
+#endif // aarch64
