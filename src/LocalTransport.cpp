@@ -255,14 +255,6 @@ public:
     ~CLocalVideoProvider() {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_shutdown = true;
-        for (auto p : m_connections) {
-            try {
-                p->pipe.cancel();
-                p->pipe.close();
-            }
-            catch(const std::exception&){
-            }
-        }
 #ifndef _WIN32
         try {
             m_acceptor.cancel();
@@ -270,6 +262,12 @@ public:
         catch(const std::exception&){
         }
 #endif
+        for (auto p : m_connections) {
+            if(p->pipe.is_open()){
+                p->pipe.cancel();
+                p->pipe.close();
+            }
+        }
         lock.unlock();
         if(m_thread.get_id()!=std::thread().get_id())
             m_thread.join();
