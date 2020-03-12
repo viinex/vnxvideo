@@ -86,15 +86,20 @@ public:
         , m_allocator(allocator) 
         , m_timestamp(0)
         , m_shutdown(false)
+#ifndef _WIN32
+        , m_acceptor(m_ios)
+#endif
     {
         if (!m_allocator.get()) {
             m_allocator.reset(CreateShmAllocator(address.c_str()));
         }
         auto pios(&m_ios);
+        bind();
         listen();
         m_thread = std::move(std::thread([pios]() {pios->run(); }));
     }
 #ifdef _WIN32
+    void bind() {}
     void listen() {
         std::shared_ptr<SECURITY_ATTRIBUTES> psa(BuildSecurityAttributes777());
 
@@ -119,18 +124,25 @@ public:
             op.release();
     }
 #else
+    void bind(){
+      std::string addr(PIPE_PATH_PREFIX + m_address);
+        unlink(addr.c_str());
+        boost::asio::local::stream_protocol::endpoint endpoint(addr);
+        m_acceptor.open(endpoint.protocol());
+        m_acceptor.set_option(boost::asio::local::stream_protocol::acceptor::reuse_address(true));
+        m_acceptor.bind(endpoint);
+        m_acceptor.listen();
+    }
     void listen(){
         auto conn = std::make_shared<SConnection>(m_ios);
         std::unique_lock<std::mutex> lock(m_mutex);
         m_connections.insert(conn);
-        boost::asio::local::stream_protocol::endpoint endpoint(PIPE_PATH_PREFIX + m_address);
-        boost::asio::local::stream_protocol::acceptor acceptor(m_ios, endpoint);
-        boost::system::error_code ec;
-        acceptor.async_accept(conn->pipe,
-                              boost::bind(&CLocalVideoProvider::acceptHandler,
-                                          this, conn, _1, 0));
+
+        m_acceptor.async_accept(conn->pipe,
+                                boost::bind(&CLocalVideoProvider::acceptHandler,
+                                            this, conn, _1, 0));
     }
-#endif  
+#endif
     void acceptHandler(std::shared_ptr<SConnection> conn, const boost::system::error_code & ec, size_t n) {
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_shutdown) {
@@ -138,8 +150,13 @@ public:
         }
         lock.unlock();
         listen(); // the connection is accepted, but we should start to listen for a new one
-        if (!ec)
+        if (!ec) {
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Accepted connection to local transport";
             scheduleRead(conn);
+        }
+        else {
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Listening for connection to local transport failed: " << ec;
+        }
     }
     void scheduleRead(std::shared_ptr<SConnection> conn, bool cont=false) {
         if(!cont)
@@ -265,6 +282,9 @@ public:
     void Flush() {}
 private:
     boost::asio::io_service m_ios;
+#ifndef _WIN32
+    boost::asio::local::stream_protocol::acceptor m_acceptor;
+#endif
     std::mutex m_mutex;
     std::set<std::shared_ptr<SConnection> > m_connections;
     std::set<std::shared_ptr<SConnection> > m_starving;
@@ -308,7 +328,7 @@ public:
         boost::asio::local::stream_protocol::endpoint endpoint(PIPE_PATH_PREFIX + m_address);
         pipe_t pipe(m_ios);
         pipe.connect(endpoint);
-        //m_pipe=pipe;
+        m_pipe = std::move(pipe);
     }
 #endif
     void openShm() {
@@ -330,8 +350,11 @@ public:
     }
 
     void connect() {
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::connect: About to connect";
         openPipe();
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::connect: Pipe/socket opened";
         openShm();
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::connect: Shared memory segment opened";
         prepareCommandBuffer(); // it's always free what has to be freed, and then request
         boost::asio::async_write(m_pipe, boost::asio::buffer(m_commandBuffer),
             boost::bind(&CLocalVideoClient::writeHandler, this, _1, _2));
@@ -367,7 +390,8 @@ public:
                 try {
                     connect();
                 }
-                catch (const std::exception&) {
+                catch (const std::exception& e) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::scheduleReconnect: " << e.what();
                     scheduleReconnect();
                 }
             }

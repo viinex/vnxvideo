@@ -30,7 +30,7 @@ public:
 
 IAllocator* const g_privateAllocator(&g_privateAllocatorImpl);
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 typedef boost::interprocess::managed_windows_shared_memory TManagedSharedMemory;
 const std::string ShmNamePrefix("Global\\viinex_shm_");
 #else
@@ -45,6 +45,9 @@ public:
     {
         const uint32_t maxSize = 1024 * 1024 * 32;
         const std::string mappingName(ShmNamePrefix + name);
+#ifndef _WIN32
+		boost::interprocess::shared_memory_object::remove(mappingName.c_str());
+#endif
         m_heap.reset(new TManagedSharedMemory(boost::interprocess::open_or_create, mappingName.c_str(), maxSize));
 #ifdef _WIN32
         DWORD res = SetNamedSecurityInfoA(const_cast<char*>(mappingName.c_str()),
