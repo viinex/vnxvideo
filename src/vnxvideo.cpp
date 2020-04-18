@@ -791,7 +791,7 @@ VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, vnxvideo_ra
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_local_transport_server_create: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_local_server_create: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
 }
