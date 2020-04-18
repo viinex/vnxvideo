@@ -10,7 +10,6 @@
 
 #include "vnxvideo.h"
 
-
 namespace VnxVideo
 {
     class IBuffer {
@@ -173,4 +172,17 @@ namespace VnxVideo
 
     VNXVIDEO_DECLSPEC void WithPreferredShmAllocator(const char* name, std::function<void(void)> action);
 
+    class CVmsChannelSelector;
+
+    class IVmsPlugin {
+    public:
+        virtual ~IVmsPlugin() {}
+        // syntax for channelSelector is described in section 2.1.14 of Viinex docs
+        virtual IH264VideoSource* CreateLiveSource(const CVmsChannelSelector& channelSelector) = 0;
+        virtual IH264VideoSource* CreateArchiveSource(const CVmsChannelSelector& channelSelector,
+            uint64_t begin, uint64_t end, double speed = 1.0) = 0;
+        virtual std::vector<std::pair<uint64_t, uint64_t>> GetArchiveTimeline(const CVmsChannelSelector& selector,
+            uint64_t begin = 0, uint64_t end = -1) = 0;
+        virtual IBuffer* GetSnapshot(const CVmsChannelSelector& selector, uint64_t timestamp) = 0;
+    };
 }
