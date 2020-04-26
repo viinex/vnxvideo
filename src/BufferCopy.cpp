@@ -36,6 +36,11 @@ int vnxvideo_buffer_wrap(const uint8_t *data, int size, vnxvideo_buffer_t* res) 
     return vnxvideo_err_ok;
 }
 
+int vnxvideo_buffer_copy_wrap(const uint8_t *data, int size, vnxvideo_buffer_t* res) {
+    res->ptr = static_cast<VnxVideo::IBuffer*>(new CBuffer(data, size, true));
+    return vnxvideo_err_ok;
+}
+
 int vnxvideo_buffer_copy(vnxvideo_buffer_t src, vnxvideo_buffer_t* dst) {
     auto s = reinterpret_cast<VnxVideo::IBuffer*>(src.ptr);
     uint8_t* data;

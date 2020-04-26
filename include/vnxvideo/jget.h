@@ -34,3 +34,14 @@ bool mjget(const nlohmann::json &value, const std::string &key, T& res) {
     }
     return false;
 }
+
+template <typename T>
+bool mjget(const nlohmann::json &value, T& res) {
+    try {
+        res = value.get<T>();
+        return true;
+    }
+    catch (...) {
+        return false;
+    }
+}

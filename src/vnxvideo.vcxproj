@@ -190,6 +190,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\vnxvideo\BufferImpl.h" />
+    <ClInclude Include="..\include\vnxvideo\VmsChannelSelector.h" />
     <ClInclude Include="..\include\vnxvideo\jget.h" />
     <ClInclude Include="..\include\vnxvideo\vnxvideo.h" />
     <ClInclude Include="..\include\vnxvideo\vnxvideoimpl.h" />

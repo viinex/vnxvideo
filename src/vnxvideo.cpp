@@ -15,6 +15,7 @@ using json = nlohmann::json;
 #include "vnxvideologimpl.h"
 
 #include "RawSample.h"
+#include "VmsChannelSelector.h"
 
 namespace NVnxVideoLogImpl {
     vnxvideo_log_t g_logHandler = nullptr;
@@ -790,7 +791,83 @@ VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, vnxvideo_ra
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_local_transport_server_create: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_local_server_create: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
+}
+
+nlohmann::json parseSelector(const std::string& channel_selector) {
+    nlohmann::json js;
+    std::string s(channel_selector);
+    std::stringstream ss(s);
+    ss >> js;
+    return js;
+}
+
+VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_free(vnxvideo_vmsplugin_t vmsplugin) {
+    VnxVideo::IVmsPlugin* vp(reinterpret_cast<VnxVideo::IVmsPlugin*>(vmsplugin.ptr));
+    delete vp;
+    return vnxvideo_err_ok;
+}
+VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_h264_source_create_live(vnxvideo_vmsplugin_t vmsplugin,
+    const char* channel_selector, vnxvideo_h264_source_t* source) {
+    VnxVideo::IVmsPlugin* vp(reinterpret_cast<VnxVideo::IVmsPlugin*>(vmsplugin.ptr));
+    try {
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "About to vnxvideo_vmsplugin_h264_source_create_live for channel selector " << channel_selector;
+        VnxVideo::CVmsChannelSelector sel(parseSelector(channel_selector));
+        source->ptr=vp->CreateLiveSource(sel);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_vmsplugin_h264_source_create_live: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_h264_source_create_archive(vnxvideo_vmsplugin_t vmsplugin,
+    const char* channel_selector, uint64_t begin, uint64_t end, double speed,
+    vnxvideo_h264_source_t* source) {
+    VnxVideo::IVmsPlugin* vp(reinterpret_cast<VnxVideo::IVmsPlugin*>(vmsplugin.ptr));
+    try {
+        VnxVideo::CVmsChannelSelector sel(parseSelector(channel_selector));
+        source->ptr = vp->CreateArchiveSource(sel, begin, end, speed);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_vmsplugin_h264_source_create_archive: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_archive_timeline(vnxvideo_vmsplugin_t vmsplugin,
+    const char* channel_selector, uint64_t begin, uint64_t end,
+    vnxvideo_buffer_t* intervals) {
+    VnxVideo::IVmsPlugin* vp(reinterpret_cast<VnxVideo::IVmsPlugin*>(vmsplugin.ptr));
+    try {
+        VnxVideo::CVmsChannelSelector sel(parseSelector(channel_selector));
+        std::vector<std::pair<uint64_t, uint64_t>> timeline(vp->GetArchiveTimeline(sel, begin, end));
+        std::vector<uint64_t> timelinePlain(timeline.size() * 2);
+        for (std::size_t k = 0; k < timeline.size(); ++k) {
+            timelinePlain[k * 2] = timeline[k].first;
+            timelinePlain[k * 2 + 1] = timeline[k].second;
+        }
+        auto ptr = timelinePlain.empty() ? nullptr : (const uint8_t*)&timelinePlain[0];
+        return vnxvideo_buffer_copy_wrap(ptr, timelinePlain.size()*sizeof(uint64_t), intervals);
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_vmsplugin_get_archive_timeline: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_snapshot(vnxvideo_vmsplugin_t vmsplugin,
+    const char* channel_selector, uint64_t timestamp, vnxvideo_buffer_t* jpeg) {
+    VnxVideo::IVmsPlugin* vp(reinterpret_cast<VnxVideo::IVmsPlugin*>(vmsplugin.ptr));
+    try {
+        VnxVideo::CVmsChannelSelector sel(parseSelector(channel_selector));
+        jpeg->ptr = vp->GetSnapshot(sel, timestamp);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_vmsplugin_get_snapshot: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+
 }

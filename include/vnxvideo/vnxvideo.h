@@ -37,6 +37,7 @@ extern "C" {
     typedef struct { void* ptr; } vnxvideo_decoder_t;
     typedef struct { void* ptr; } vnxvideo_renderer_t;
 
+    typedef struct { void* ptr; } vnxvideo_vmsplugin_t;
 #pragma pack(pop)
 
     typedef enum { VNXLOG_NONE=0, VNXLOG_ERROR=1, VNXLOG_WARNING=2, VNXLOG_INFO=3, VNXLOG_DEBUG=4, VNXLOG_HIGHEST=10} ELogLevel;
@@ -94,6 +95,8 @@ extern "C" {
     // it won't share the same memory ("data") but will have its own buffer, and will automatically manage its lifetime.
     // note that vnxvideo_buffer_t instance created by vnxvideo_buffer_wrap should be freed, as any other vnxvideo_buffer_t.
     VNXVIDEO_DECLSPEC int vnxvideo_buffer_wrap(const uint8_t *data, int size, vnxvideo_buffer_t*);
+    // copy memory and wrap it into vnxvideo buffer in a single call
+    VNXVIDEO_DECLSPEC int vnxvideo_buffer_copy_wrap(const uint8_t *data, int size, vnxvideo_buffer_t*);
     //VNXVIDEO_DECLSPEC vnxvideo_buffer_t vnxvideo_raw_sample_to_buffer(vnxvideo_raw_sample_t); // cast, not duplication
     VNXVIDEO_DECLSPEC int vnxvideo_raw_sample_dup(vnxvideo_raw_sample_t, vnxvideo_raw_sample_t*); // shallow copy (share same data w/original)
     VNXVIDEO_DECLSPEC int vnxvideo_raw_sample_copy(vnxvideo_raw_sample_t, vnxvideo_raw_sample_t*); // deep copy
@@ -189,6 +192,19 @@ extern "C" {
     VNXVIDEO_DECLSPEC void vnxvideo_h264_source_free(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_start(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_stop(vnxvideo_h264_source_t source);
+
+    typedef int (*vnxvideo_vmsplugin_create_t)(const char* json_config, vnxvideo_vmsplugin_t* vmsplugin);
+    VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_free(vnxvideo_vmsplugin_t vmsplugin);
+    VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_h264_source_create_live(vnxvideo_vmsplugin_t vmsplugin,
+        const char* channel_selector, vnxvideo_h264_source_t* source);
+    VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_h264_source_create_archive(vnxvideo_vmsplugin_t vmsplugin,
+        const char* channel_selector, uint64_t begin, uint64_t end, double speed,
+        vnxvideo_h264_source_t* source);
+    VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_archive_timeline(vnxvideo_vmsplugin_t vmsplugin,
+        const char* channel_selector, uint64_t begin, uint64_t end,
+        vnxvideo_buffer_t* intervals); // out buffer holds a flat array of pairs of uint64_t, unmarshalled (in native byte order)
+    VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_snapshot(vnxvideo_vmsplugin_t vmsplugin,
+        const char* channel_selector, uint64_t timestamp, vnxvideo_buffer_t* jpeg);
 
 #ifdef __cplusplus
 }

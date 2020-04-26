@@ -10,7 +10,6 @@
 
 #include "vnxvideo.h"
 
-
 namespace VnxVideo
 {
     class IBuffer {
@@ -34,6 +33,14 @@ namespace VnxVideo
     typedef typename std::function<void(IRawSample*, uint64_t)> TOnFrameCallback;
     typedef typename std::function<void(IBuffer*, uint64_t)> TOnBufferCallback;
     typedef typename std::function<void(const std::string& json, uint64_t)> TOnJsonCallback;
+    // A (new, as of 2020-04-25) convention for TOnFrameCallback and TOnBufferCallback: 
+    // a call with (nullptr,_) means an "end of stream", -- maybe because of an unrecoverable error
+    // (unrecoverable for the caller object). It means that a data source object is no longer going to 
+    // produce any new data. It still should be Stopped and destroyed.
+    // For now (2020-04-25) all known live sources do avoid this behavior though and attempt 
+    // to implement recovery themselves, they don't send nullptrs. No contradiction here: they believe
+    // there are not unrecoverable errors for them.
+    // For one-shot sources, like archive playback sessions, reporting an end of stream is mandatory.
 
     class IVideoSource {
     public:
@@ -173,4 +180,17 @@ namespace VnxVideo
 
     VNXVIDEO_DECLSPEC void WithPreferredShmAllocator(const char* name, std::function<void(void)> action);
 
+    class CVmsChannelSelector;
+
+    class IVmsPlugin {
+    public:
+        virtual ~IVmsPlugin() {}
+        // syntax for channelSelector is described in section 2.1.14 of Viinex docs
+        virtual IH264VideoSource* CreateLiveSource(const CVmsChannelSelector& channelSelector) = 0;
+        virtual IH264VideoSource* CreateArchiveSource(const CVmsChannelSelector& channelSelector,
+            uint64_t begin, uint64_t end, double speed = 1.0) = 0;
+        virtual std::vector<std::pair<uint64_t, uint64_t>> GetArchiveTimeline(const CVmsChannelSelector& selector,
+            uint64_t begin = 0, uint64_t end = -1) = 0;
+        virtual IBuffer* GetSnapshot(const CVmsChannelSelector& selector, uint64_t timestamp) = 0;
+    };
 }
