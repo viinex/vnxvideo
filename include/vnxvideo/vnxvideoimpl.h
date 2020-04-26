@@ -33,6 +33,14 @@ namespace VnxVideo
     typedef typename std::function<void(IRawSample*, uint64_t)> TOnFrameCallback;
     typedef typename std::function<void(IBuffer*, uint64_t)> TOnBufferCallback;
     typedef typename std::function<void(const std::string& json, uint64_t)> TOnJsonCallback;
+    // A (new, as of 2020-04-25) convention for TOnFrameCallback and TOnBufferCallback: 
+    // a call with (nullptr,_) means an "end of stream", -- maybe because of an unrecoverable error
+    // (unrecoverable for the caller object). It means that a data source object is no longer going to 
+    // produce any new data. It still should be Stopped and destroyed.
+    // For now (2020-04-25) all known live sources do avoid this behavior though and attempt 
+    // to implement recovery themselves, they don't send nullptrs. No contradiction here: they believe
+    // there are not unrecoverable errors for them.
+    // For one-shot sources, like archive playback sessions, reporting an end of stream is mandatory.
 
     class IVideoSource {
     public:
