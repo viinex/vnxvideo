@@ -6,6 +6,7 @@
 #include <boost/interprocess/managed_shared_memory.hpp>
 #endif
 #include <algorithm>
+
 #include "RawSample.h"
 #include "vnxvideologimpl.h"
 
