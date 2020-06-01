@@ -95,14 +95,27 @@ public:
         , m_width(width)
         , m_height(height)
     {
-        Init(EMF_I420, width, height, nullptr, nullptr, (allocator==nullptr)?g_privateAllocator:allocator /*true*/);
+        IAllocator* a = allocator;
+        if (a == nullptr)
+            a = GetPreferredShmAllocator().get();
+        if (a == nullptr)
+            a = g_privateAllocator;
+
+        Init(EMF_I420, width, height, nullptr, nullptr, a);
     }
     CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes, bool copyData)
         : m_csp((planes != nullptr && !copyData)?csp:EMF_I420)
         , m_width(width)
         , m_height(height)
     {
-        Init(csp, width, height, strides, planes, (copyData?g_privateAllocator:nullptr));
+        IAllocator* a = nullptr;
+        if (copyData) {
+            a = GetPreferredShmAllocator().get();
+            if (a == nullptr)
+                a = g_privateAllocator;
+        }
+
+        Init(csp, width, height, strides, planes, a);
     }
     CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes,
                std::shared_ptr<void> underlying) // there's an underlying shared object which allows us not to copy data

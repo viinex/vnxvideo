@@ -69,6 +69,9 @@ public:
         return res;
     }
     virtual uint64_t FromPointer(void* ptr) {
+        if (!m_heap->belongs_to_segment(ptr)) {
+            throw std::runtime_error("CShmAllocator::FromPointer(): given pointer does not belong to this allocator");
+        }
         return (uint64_t)m_heap->get_handle_from_address(ptr);
     }
     virtual void* ToPointer(uint64_t offset) {
