@@ -433,7 +433,7 @@ public:
         std::stringstream ss(mode);
         ss >> jm;
         CComPtr<IPin> pin=SetMode(bf, jm);
-        return new CVideoDevice(bf, pin, GetPreferredShmAllocator());
+        return new CVideoDevice(bf, pin, DupPreferredShmAllocator());
     }
 private:
     CCoInitialize m_coInitialize;

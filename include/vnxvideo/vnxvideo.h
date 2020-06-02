@@ -25,6 +25,7 @@ extern "C" {
     typedef struct { void* ptr; } vnxvideo_videosource_t;
     typedef struct { void* ptr; } vnxvideo_buffer_t;
     typedef struct { void* ptr; } vnxvideo_raw_sample_t;
+    typedef struct { void* ptr; } vnxvideo_allocator_t;
 
     typedef struct { void* ptr; } vnxvideo_rawproc_t; // raw processor - a superclass
     typedef struct { void* ptr; } vnxvideo_h264_encoder_t;
@@ -62,7 +63,7 @@ extern "C" {
     typedef int(*vnxvideo_on_raw_sample_t)(void* usrptr, vnxvideo_raw_sample_t buffer, uint64_t timestamp);
     typedef int(*vnxvideo_on_json_t)(void* usrptr, const char* json_buffer, int json_buffer_size, uint64_t timestamp);
 
-    typedef void(*vnxvideo_action_t)();
+    typedef void(*vnxvideo_action_t)(void* usrptr);
 
     // call only once. second call will be ignored with invalid paramteter error code
     VNXVIDEO_DECLSPEC int vnxvideo_init(vnxvideo_log_t log_handler, void* usrptr, ELogLevel max_level);
@@ -179,7 +180,10 @@ extern "C" {
         uint8_t* backgroundColor, vnxvideo_raw_sample_t backgroundImage);
     VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_nosignal(vnxvideo_renderer_t renderer, vnxvideo_raw_sample_t nosignalImage);
 
-    VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator(const char* name, vnxvideo_action_t action);
+    VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, vnxvideo_action_t action, void* usrptr);
+    VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_ptr(vnxvideo_allocator_t allocator, vnxvideo_action_t action, void* usrptr);
+    VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_duplicate(vnxvideo_allocator_t* allocator);
+    VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_free(vnxvideo_allocator_t allocator);
 
     VNXVIDEO_DECLSPEC int vnxvideo_local_client_create(const char* name, vnxvideo_videosource_t* out);
     VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, vnxvideo_rawproc_t* out);

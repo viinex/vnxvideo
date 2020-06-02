@@ -764,9 +764,9 @@ VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_nosignal(vnxvideo_renderer_t rendere
 }
 
 
-VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator(const char* name, vnxvideo_action_t action) {
+VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, vnxvideo_action_t action, void* usrptr) {
     try {
-        VnxVideo::WithPreferredShmAllocator(name, action);
+        VnxVideo::WithPreferredShmAllocator(name, std::bind(action, usrptr));
         return 0;
     }
     catch (const std::exception& e) {
@@ -774,6 +774,30 @@ VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator(const char* name, vnxvideo_act
         return vnxvideo_err_external_api;
     }
 }
+
+VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_ptr(vnxvideo_allocator_t allocator, vnxvideo_action_t action, void* usrptr) {
+    try {
+        IShmAllocator* allocatorPtr = reinterpret_cast<IShmAllocator*>(allocator.ptr);
+        WithPreferredShmAllocator(allocatorPtr, std::bind(action, usrptr));
+        return 0;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_with_shm_allocator: " << e.what();
+        return vnxvideo_err_external_api;
+    }
+
+}
+
+VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_duplicate(vnxvideo_allocator_t* out) {
+    IShmAllocator *allocator = GetPreferredShmAllocator();
+    if (allocator!=nullptr)
+        allocator = allocator->Dup();
+    out->ptr = allocator;
+}
+VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_free(vnxvideo_allocator_t allocator) {
+    delete reinterpret_cast<IShmAllocator*>(allocator.ptr);
+}
+
 
 VNXVIDEO_DECLSPEC int vnxvideo_local_client_create(const char* name, vnxvideo_videosource_t* out) {
     try {

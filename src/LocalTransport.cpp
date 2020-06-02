@@ -511,6 +511,6 @@ namespace VnxVideo {
     }
 
     IRawProc *CreateLocalVideoProvider(const char* name) {
-        return new CLocalVideoProvider(name, GetPreferredShmAllocator());
+        return new CLocalVideoProvider(name, DupPreferredShmAllocator());
     }
 }

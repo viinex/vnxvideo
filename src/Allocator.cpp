@@ -68,6 +68,10 @@ public:
         }
         return res;
     }
+    CShmAllocator(CShmAllocator* dup)
+        :   m_heap(dup->m_heap)
+    {
+    }
     virtual uint64_t FromPointer(void* ptr) {
         if (!m_heap->belongs_to_segment(ptr)) {
             throw std::runtime_error("CShmAllocator::FromPointer(): given pointer does not belong to this allocator");
@@ -76,6 +80,9 @@ public:
     }
     virtual void* ToPointer(uint64_t offset) {
         return m_heap->get_address_from_handle((ptrdiff_t)offset);
+    }
+    virtual IShmAllocator* Dup() {
+        return new CShmAllocator(this);
     }
 private:
     std::shared_ptr<TManagedSharedMemory> m_heap;
@@ -106,35 +113,37 @@ IShmMapping* CreateShmMapping(const char* name) {
     return new CShmMapping(name);
 }
 
-thread_local PShmAllocator* g_preferredAllocator=nullptr;
+thread_local IShmAllocator* g_preferredAllocator=nullptr;
 class CWithPreferredAllocator {
 public:
-    CWithPreferredAllocator(PShmAllocator allocator)
-        : m_allocator(allocator)
-        , m_prev(g_preferredAllocator) {
-        g_preferredAllocator = &m_allocator;
+    CWithPreferredAllocator(IShmAllocator* allocator)
+        : m_prev(g_preferredAllocator) {
+        g_preferredAllocator = allocator;
     }
     ~CWithPreferredAllocator() {
         g_preferredAllocator = m_prev;
     }
 private:
-    PShmAllocator m_allocator;
-    PShmAllocator* m_prev;
+    IShmAllocator* m_prev;
 };
 
-void WithPreferredShmAllocator(PShmAllocator allocator, std::function<void(void)> action) {
+void WithPreferredShmAllocator(IShmAllocator *allocator, std::function<void(void)> action) {
     CWithPreferredAllocator x(allocator);
     action();
 }
-PShmAllocator GetPreferredShmAllocator() {
-    if (g_preferredAllocator != nullptr)
-        return *g_preferredAllocator;
+IShmAllocator* GetPreferredShmAllocator() {
+    return g_preferredAllocator;
+}
+PShmAllocator DupPreferredShmAllocator() {
+    if (g_preferredAllocator)
+        return PShmAllocator(g_preferredAllocator->Dup());
     else
         return PShmAllocator();
 }
 
 namespace VnxVideo {
     void WithPreferredShmAllocator(const char* name, std::function<void(void)> action) {
-        WithPreferredShmAllocator(PShmAllocator(CreateShmAllocator(name)), action);
+        PShmAllocator allocator(CreateShmAllocator(name));
+        WithPreferredShmAllocator(allocator.get(), action);
     }
 }

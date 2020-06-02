@@ -21,7 +21,10 @@ public:
     virtual void* ToPointer(uint64_t offset) = 0;
 };
 
-class IShmAllocator : public virtual IAllocator, public virtual IShmMapping {};
+class IShmAllocator : public virtual IAllocator, public virtual IShmMapping {
+public:
+    virtual IShmAllocator* Dup() = 0;
+};
 typedef std::shared_ptr<IShmAllocator> PShmAllocator;
 
 extern IAllocator* const g_privateAllocator;
@@ -29,8 +32,9 @@ extern IAllocator* const g_privateAllocator;
 IShmAllocator *CreateShmAllocator(const char* name);
 IShmMapping* CreateShmMapping(const char* name);
 
-void WithPreferredShmAllocator(PShmAllocator allocator, std::function<void(void)> action);
-PShmAllocator GetPreferredShmAllocator();
+void WithPreferredShmAllocator(IShmAllocator* allocator, std::function<void(void)> action);
+IShmAllocator* GetPreferredShmAllocator();
+PShmAllocator DupPreferredShmAllocator();
 
 
 class CRawSample : public VnxVideo::IRawSample
@@ -97,7 +101,7 @@ public:
     {
         IAllocator* a = allocator;
         if (a == nullptr)
-            a = GetPreferredShmAllocator().get();
+            a = GetPreferredShmAllocator();
         if (a == nullptr)
             a = g_privateAllocator;
 
@@ -110,7 +114,7 @@ public:
     {
         IAllocator* a = nullptr;
         if (copyData) {
-            a = GetPreferredShmAllocator().get();
+            a = GetPreferredShmAllocator();
             if (a == nullptr)
                 a = g_privateAllocator;
         }

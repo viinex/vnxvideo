@@ -522,6 +522,6 @@ private:
 
 namespace VnxVideo {
     IRenderer* CreateRenderer(int refresh_rate) {
-        return new CRenderer(refresh_rate, GetPreferredShmAllocator());
+        return new CRenderer(refresh_rate, DupPreferredShmAllocator());
     }
 }
