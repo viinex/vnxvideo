@@ -319,6 +319,8 @@ public:
         , m_width(0)
         , m_height(0)
         , m_csp(EColorspace::EMF_NONE)
+
+        , m_running(false)
     {
     }
 #ifdef _WIN32
@@ -393,6 +395,11 @@ public:
 
     void scheduleReconnect() {
         m_pipe.close();
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            if (!m_running)
+                return;
+        }
         m_timer.expires_from_now(std::chrono::nanoseconds(1000000000));
         m_timer.async_wait([this](const boost::system::error_code & ec) {
             if (!ec) {
@@ -451,6 +458,7 @@ private:
     boost::asio::steady_timer m_timer;
     pipe_t m_pipe;
     std::shared_ptr<IShmMapping> m_mapping;
+    bool m_running;
     std::mutex m_mutex;
     std::thread m_thread;
 
@@ -482,6 +490,10 @@ public: // IVideoSource
         m_onFrame = onFrame;
     }
     virtual void Run() {
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_running = true;
+        }
         try {
             connect();
         }
@@ -492,6 +504,10 @@ public: // IVideoSource
         m_thread = std::move(std::thread([pios]() {pios->run(); }));
     }
     virtual void Stop() {
+        {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_running = false;
+        }
         m_timer.cancel();
         try {
             m_pipe.cancel();
