@@ -51,7 +51,7 @@ inline EColorspace fromAVPixelFormat(AVPixelFormat format) {
     case AV_PIX_FMT_YUV422P: return EMF_YV12; break;
     case AV_PIX_FMT_NV12: return EMF_NV12; break;
     case AV_PIX_FMT_NV21: return EMF_NV21; break;
-    case AV_PIX_FMT_YUYV422: return EMF_YUYV; break;
+    case AV_PIX_FMT_YUYV422: return EMF_YUY2; break;
     case AV_PIX_FMT_UYVY422: return EMF_UYVY; break;
     case AV_PIX_FMT_YUV410P: return EMF_YVU9; break;
 

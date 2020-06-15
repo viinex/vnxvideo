@@ -48,7 +48,7 @@ namespace
         case V4L2_PIX_FMT_BGR24: return "RGB";
             
         //case 0x59455247: return "GREY";
-        case V4L2_PIX_FMT_YUYV: return "YUYV";
+        case V4L2_PIX_FMT_YUYV: return "YUY2";
         case V4L2_PIX_FMT_UYVY: return "UYVY";
         case 0x32595559: return "YUY2";
         case V4L2_PIX_FMT_YUV420M: return "YV12";
@@ -71,9 +71,9 @@ namespace
     EColorspace string2csp(const std::string &s) {
         if (s == "RGB") return EMF_RGB24;
         //else if (s == "GREY") return 0x59455247;
-        else if (s == "YUYV") return EMF_YUYV;
+        else if (s == "YUYV") return EMF_YUY2;
         else if (s == "UYVY") return EMF_UYVY;
-        else if (s == "YUY2") return EMF_YUYV;
+        else if (s == "YUY2") return EMF_YUY2;
         else if (s == "YV12") return EMF_YV12;
         else if (s == "YVU9") return EMF_YVU9;
         else if (s == "IYUV") return EMF_I420;
@@ -87,7 +87,7 @@ namespace
     }
     int csp2pf(EColorspace csp){
         switch(csp){
-        case EMF_YUYV: return V4L2_PIX_FMT_YUYV;
+        case EMF_YUY2: return V4L2_PIX_FMT_YUYV;
         case EMF_UYVY: return V4L2_PIX_FMT_UYVY;
         case EMF_YVU9: return V4L2_PIX_FMT_YVU410;
         case EMF_I420: return V4L2_PIX_FMT_YUV420;

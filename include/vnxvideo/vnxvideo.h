@@ -56,7 +56,12 @@ extern "C" {
         // supported by encoder and IRawProc w/o conversion:
         EMF_I420, EMF_YV12, EMF_NV12, EMF_NV21, 
         // unsupported w/o conversion:
-        EMF_YUYV, EMF_UYVY, EMF_YVU9, EMF_RGB32, EMF_RGB24, EMF_RGB16 // RGB formats are assumed packed here
+        EMF_YUY2, EMF_UYVY, EMF_YVU9, 
+        EMF_RGB32, EMF_RGB24, EMF_RGB16 // RGB formats are assumed packed here
+        , EMF_I444 // YUV planar w/o chroma subsampling
+        , EMF_P422 // YUV planar 4:2:2. Could not find appropriate FOURCC
+        , EMF_P440 // YUV planar 4:4:0, meaning that all chroma readings are taken from 1st line
+        , EMF_GRAY // YUV 4:0:0
     } EColorspace;
     typedef int(*vnxvideo_on_frame_format_t)(void* usrptr, EColorspace csp, int width, int height);
     typedef int(*vnxvideo_on_buffer_t)(void* usrptr, vnxvideo_buffer_t buffer, uint64_t timestamp);

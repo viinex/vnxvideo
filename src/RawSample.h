@@ -59,22 +59,24 @@ private:
     void Init(EColorspace csp, int width, int height, int* strides, uint8_t **planes, IAllocator* copyData)
     {
         if (csp != EMF_I420 && planes != nullptr && !copyData)
-            throw std::logic_error("Sample format other than I420 is only supported when wrapping a frame");
+            throw std::logic_error("Sample format other than I420 is only supported when wrapping or allocating a frame");
 
         if (copyData) {
             FillStridesOffsets(m_csp, m_width, m_height, m_nplanes, m_strides, m_offsets, true);
-            for (int k = 0; k < 3; ++k)
+            for (int k = 0; k < m_nplanes; ++k)
                 m_strides[k] = ceil16(m_strides[k]);
 
+            int height2 = m_height;
+            if (m_csp == EMF_I420 || m_csp == EMF_P440)
+                height2 /= 2;
+            int heights[3] = { m_height, height2, height2 };
             // how did it come to this:
             // see https://github.com/mozilla/mozjpeg/blob/master/turbojpeg.c#L630
             // function tjBufSize. Both width and height are rounded up to MCU size (which is at most 16).
             // 2048 is added then (in advance?).
-            const int size = 
-                m_strides[0] * ceil16(m_height) + 
-                m_strides[1] * ceil16(m_height / 2) + 
-                m_strides[2] * ceil16(m_height / 2) + 
-                2048;
+            int size = 2048;
+            for (int k = 0; k < m_nplanes; ++k)
+                size += m_strides[k] * ceil16(heights[k]);
             m_data=copyData->Alloc(size);
             if (nullptr == m_data)
                 throw std::runtime_error("CRawSample::Init(): Cannot allocate data buffer");
@@ -107,8 +109,10 @@ public:
 
         Init(EMF_I420, width, height, nullptr, nullptr, a);
     }
+    // copyData means copy actually, into I420, only if the source data is specified;
+    // otherwise copyData means allocate memory for the sample of specific size and colorspace
     CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes, bool copyData)
-        : m_csp((planes != nullptr && !copyData)?csp:EMF_I420)
+        : m_csp((planes != nullptr && copyData)?EMF_I420:csp)
         , m_width(width)
         , m_height(height)
     {
@@ -176,11 +180,41 @@ public:
             offsets[0] = 0;
             offsets[1] = width*height;
             break;
-        case EMF_YUYV:
+        case EMF_YUY2:
         case EMF_UYVY:
             nplanes = 1;
             strides[0] = width*2;
             offsets[0] = 0;
+            break;
+        case EMF_I444:
+            nplanes = 3;
+            strides[0] = strides[1] = strides[2] = ceilDim(width);
+            offsets[0] = 0;
+            offsets[1] = strides[0] * ceilDim(height);
+            offsets[2] = offsets[1] + strides[1] * ceilDim(height);
+            break;
+        case EMF_P422:
+            nplanes = 3;
+            strides[0] = ceilDim(width);
+            strides[1] = strides[2] = ceilDim(width) / 2;
+            offsets[0] = 0;
+            offsets[1] = strides[0] * ceilDim(height);
+            offsets[2] = offsets[1] + strides[1] * ceilDim(height);
+            break;
+        case EMF_P440:
+            nplanes = 3;
+            strides[0] = strides[1] = strides[2] = ceilDim(width);
+            offsets[0] = 0;
+            offsets[1] = strides[0] * ceilDim(height/2);
+            offsets[2] = offsets[1] + strides[1] * ceilDim(height/2);
+            break;
+        case EMF_GRAY:
+            nplanes = 1;
+            strides[0] = ceilDim(width);
+            strides[1] = strides[2] = 0;
+            offsets[0] = 0;
+            offsets[1] = strides[0] * ceilDim(height);
+            offsets[2] = offsets[1] + strides[1] * ceilDim(height);
             break;
         }
     }
@@ -198,7 +232,7 @@ public:
         {
             ippiYCrCb420ToYCbCr422_8u_P3R((const Ipp8u**)src, src_strides, dst, dst_strides, roi);
         }
-        else if (src_emf == EMF_YUYV)
+        else if (src_emf == EMF_YUY2)
         {
             // todo - swap dst u and v planes here
             ippiYCrCb422ToYCbCr422_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
@@ -227,7 +261,34 @@ public:
             ippiCopy_8u_C1R(src[2], src_strides[2], dst[1], dst_strides[1], roi2);
             ippiCopy_8u_C1R(src[1], src_strides[1], dst[2], dst_strides[2], roi2);
         }
-        else if (src_emf == EMF_YUYV)
+        else if (src_emf == EMF_I444)
+        {
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height }, dst[1], dst_strides[1], roi2, 0.5, 0.5, IPPI_INTER_NN);
+            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height }, dst[2], dst_strides[2], roi2, 0.5, 0.5, IPPI_INTER_NN);
+        }
+        else if (src_emf == EMF_P422) {
+            IppiSize roi2 = { width / 2, height / 2 };
+            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            ippiCopy_8u_C1R(src[1], src_strides[1] * 2, dst[1], dst_strides[1], roi2);
+            ippiCopy_8u_C1R(src[2], src_strides[2] * 2, dst[2], dst_strides[2], roi2);
+        }
+        else if (src_emf == EMF_P440)
+        {
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height/2 }, dst[1], dst_strides[1], roi2, 0.5, 1, IPPI_INTER_NN);
+            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height/2 }, dst[2], dst_strides[2], roi2, 0.5, 1, IPPI_INTER_NN);
+        }
+        else if (src_emf == EMF_GRAY)
+        {
+            IppiSize roi2 = { width / 2, height / 2 };
+            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            ippiSet_8u_C1R(0x80, dst[1], dst_strides[1], roi2);
+            ippiSet_8u_C1R(0x80, dst[2], dst_strides[2], roi2);
+        }
+        else if (src_emf == EMF_YUY2)
         {
             ippiYCbCr422ToYCbCr420_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }

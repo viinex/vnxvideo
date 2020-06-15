@@ -257,7 +257,7 @@ public:
             if (IsEqualGUID(*media->Subtype(), MEDIASUBTYPE_YUYV) ||
                 IsEqualGUID(*media->Subtype(), MEDIASUBTYPE_YUY2))
             {
-                m_cspOrig = EMF_YUYV;
+                m_cspOrig = EMF_YUY2;
             }
             else if (IsEqualGUID(*media->Subtype(), MEDIASUBTYPE_UYVY))
             {
@@ -569,13 +569,8 @@ private:
         std::wstring_convert<std::codecvt_utf8<wchar_t>> conv;
         HRESULT hr;
 
-        int format(biCompressionFromString(jget<std::string>(mode, "colorspace")));
         int bpp;
-        int planes;
-        if (0 == format) {
-            bpp = jget<int>(mode, "bpp");
-            planes = jget<int>(mode, "planes");
-        }
+        int format(biCompressionFromString(jget<std::string>(mode, "colorspace"),bpp));
         int width = 0, height = 0;
         auto jsz = mode.find("size");
         if (jsz != mode.end()) {
@@ -612,7 +607,7 @@ private:
             {
                 if (true
                     && bih->biCompression == format
-                    && ((0 != format) || (bih->biBitCount == bpp && bih->biPlanes == planes))
+                    && ((0 != format) || (bih->biBitCount == bpp))
                     && bih->biWidth == width
                     && abs(bih->biHeight) == height
                     && true)
@@ -953,11 +948,7 @@ private:
                 std::stringstream ss;
                 json j;
                 j["pin"] = conv.to_bytes(pinId);
-                j["colorspace"] = biCompressionToString(bih->biCompression);
-                if (bih->biCompression == 0) {
-                    j["bpp"] = bih->biBitCount;
-                    j["planes"] = bih->biPlanes;
-                }
+                j["colorspace"] = biCompressionToString(bih->biCompression, bih->biBitCount);
                 j["size"] = { bih->biWidth, abs(bih->biHeight) };
                 j["framerate"] = round(10000000.0 / float(*fr));
                 /*
@@ -976,11 +967,11 @@ private:
         }
     }
 
-    static std::string biCompressionToString(DWORD c) {
+    static std::string biCompressionToString(DWORD c, int bpp = 0) {
         switch (c) {
-        case 0: return "RGB";
+        case 0: return "RGB"+std::to_string(bpp);
         case 0x59455247: return "GREY";
-        case 0x56595559: return "YUYV";
+        case 0x56595559: return "YUY2";// "YUYV";
         case 0x59565955: return "UYVY";
         case 0x32595559: return "YUY2";
         case 0x32315659: return "YV12";
@@ -994,8 +985,11 @@ private:
             return s;
         }
     }
-    static DWORD biCompressionFromString(const std::string &s) {
-        if (s == "RGB") return 0;
+    static DWORD biCompressionFromString(const std::string &s, int& bpp) {
+        if (s.substr(0,3) == "RGB") {
+            bpp = atoi(s.substr(3).c_str());
+            return 0;
+        }
         else if (s == "GREY") return 0x59455247;
         else if (s == "YUYV") return 0x56595559;
         else if (s == "UYVY") return 0x59565955;
