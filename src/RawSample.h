@@ -385,8 +385,8 @@ public:
     void GetData(int* strides, uint8_t** planes) {
         m_sample->GetData(strides, planes);
         planes[0] += m_top*strides[0] + m_left;
-        planes[1] += m_top*strides[1] + m_left / 2;
-        planes[2] += m_top*strides[2] + m_left / 2;
+        planes[1] += (m_top / 2)*strides[1] + m_left / 2;
+        planes[2] += (m_top / 2)*strides[2] + m_left / 2;
     }
 private:
     std::shared_ptr<VnxVideo::IRawSample> m_sample;
