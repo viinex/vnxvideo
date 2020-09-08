@@ -58,7 +58,9 @@ CVCamStream::CVCamStream(HRESULT *phr, CVCam *pParent, LPCWSTR pPinName) :
     m_source->Subscribe([this](EColorspace csp, int width, int height) {this->onFormat(csp, width, height); },
         [this](VnxVideo::IRawSample* sample, uint64_t timestamp) {this->onFrame(sample, timestamp); });
     m_source->Run();
-    InitMediaType();
+
+    m_mt.InitMediaType();
+    InitMediaType(&m_mt, nullptr);
 }
 
 void CVCamStream::onFormat(EColorspace csp, int width, int height) {
@@ -147,21 +149,12 @@ HRESULT CVCamStream::FillBuffer(IMediaSample *pms)
 
     CRawSample::CopyRawToI420(width, height, EMF_I420, planes, strides, dstplanes, dststrides);
 
-    //static int j = 0;
-    //++j;
-    //for (int i = 0; i < lDataLen; ++i)
-    //    pData[i] = pData[i] | ((i+j) & 0xf);
-        
-
-    //CRefTime graphNow;
-    //m_pParent->StreamTime(graphNow);
-    // set PTS (presentation) timestamps...
     REFERENCE_TIME now = (timestamp - m_timestamp0) * 10000; // milliseconds to 100 nanoseconds
     REFERENCE_TIME endThisFrame = now + avgFrameTime;
     pms->SetTime((REFERENCE_TIME *)&now, &endThisFrame);
     pms->SetSyncPoint(TRUE);
-    // not sure on this one...probably should be true only for our first packet
-    // pms->SetDiscontinuity(FALSE);
+    
+    pms->SetDiscontinuity(FALSE);
 
     return NOERROR;
 } // FillBuffer
@@ -199,13 +192,13 @@ HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType* pmt)
         return E_INVALIDARG;
 }
 
-void CVCamStream::InitMediaType()
+void CVCamStream::InitMediaType(CMediaType* pmt, BYTE* pSCC)
 {
-    m_mt.InitMediaType();
-    CMediaType* pmt = &m_mt;
-
     DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
     ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
+
+    int width, height;
+    EColorspace csp;
 
     {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -213,15 +206,19 @@ void CVCamStream::InitMediaType()
             m_condition.wait_for(lock, std::chrono::milliseconds(2000));
         if (m_csp != EMF_I420)
             throw std::runtime_error("Source colorspace other than I420 not supported");
-        pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
-        pvi->bmiHeader.biBitCount = 12;
-        pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        pvi->bmiHeader.biWidth = m_width;
-        pvi->bmiHeader.biHeight = m_height;
-        pvi->bmiHeader.biPlanes = 3;
-        pvi->bmiHeader.biSizeImage = m_width * m_height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
-        pvi->bmiHeader.biClrImportant = 0;
+        csp = m_csp;
+        width = m_width;
+        height = m_height;
     }
+
+    pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
+    pvi->bmiHeader.biBitCount = 12;
+    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    pvi->bmiHeader.biWidth = width;
+    pvi->bmiHeader.biHeight = height;
+    pvi->bmiHeader.biPlanes = 3;
+    pvi->bmiHeader.biSizeImage = width * height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
+    pvi->bmiHeader.biClrImportant = 0;
 
     pvi->AvgTimePerFrame = 333333; // 100ns
 
@@ -234,7 +231,40 @@ void CVCamStream::InitMediaType()
 
     pmt->SetSubtype(&MEDIASUBTYPE_IYUV);
     pmt->SetSampleSize(pvi->bmiHeader.biSizeImage);
-} // GetMediaType
+
+    if (!pSCC)
+        return;
+
+    DECLARE_PTR(VIDEO_STREAM_CONFIG_CAPS, pvscc, pSCC);
+
+    pvscc->guid = FORMAT_VideoInfo;
+    pvscc->VideoStandard = AnalogVideo_None;
+    pvscc->InputSize.cx = width;
+    pvscc->InputSize.cy = height;
+    pvscc->MinCroppingSize.cx = width;
+    pvscc->MinCroppingSize.cy = height;
+    pvscc->MaxCroppingSize.cx = width;
+    pvscc->MaxCroppingSize.cy = height;
+    pvscc->CropGranularityX = 80;
+    pvscc->CropGranularityY = 60;
+    pvscc->CropAlignX = 0;
+    pvscc->CropAlignY = 0;
+
+    pvscc->MinOutputSize.cx = width;
+    pvscc->MinOutputSize.cy = height;
+    pvscc->MaxOutputSize.cx = width;
+    pvscc->MaxOutputSize.cy = height;
+    pvscc->OutputGranularityX = 0;
+    pvscc->OutputGranularityY = 0;
+    pvscc->StretchTapsX = 0;
+    pvscc->StretchTapsY = 0;
+    pvscc->ShrinkTapsX = 0;
+    pvscc->ShrinkTapsY = 0;
+    pvscc->MinFrameInterval = 200000;   //50 fps
+    pvscc->MaxFrameInterval = 50000000; // 0.2 fps
+    pvscc->MinBitsPerSecond = (80 * 60 * 3 * 8) / 5;
+    pvscc->MaxBitsPerSecond = 640 * 480 * 3 * 8 * 50;
+}
 
   // This method is called to see if a given output format is supported
 HRESULT CVCamStream::CheckMediaType(const CMediaType *pMediaType)
@@ -305,62 +335,16 @@ HRESULT STDMETHODCALLTYPE CVCamStream::GetNumberOfCapabilities(int *piCount, int
 
 HRESULT STDMETHODCALLTYPE CVCamStream::GetStreamCaps(int iIndex, AM_MEDIA_TYPE **pmt, BYTE *pSCC)
 {
-    *pmt = CreateMediaType(&m_mt);
-    DECLARE_PTR(VIDEOINFOHEADER, pvi, (*pmt)->pbFormat);
-
-    //if (iIndex == 0) iIndex = 4;
-
-    pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
-    pvi->bmiHeader.biBitCount = 12;
-    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    pvi->bmiHeader.biWidth = m_width;
-    pvi->bmiHeader.biHeight = m_height;
-    pvi->bmiHeader.biPlanes = 3;
-    pvi->bmiHeader.biSizeImage = m_width * m_height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
-    pvi->bmiHeader.biClrImportant = 0;
-
-    SetRectEmpty(&(pvi->rcSource)); // we want the whole image area rendered.
-    SetRectEmpty(&(pvi->rcTarget)); // no particular destination rectangle
-
-    (*pmt)->majortype = MEDIATYPE_Video;
-    (*pmt)->subtype = MEDIASUBTYPE_IYUV;
-    (*pmt)->formattype = FORMAT_VideoInfo;
-    (*pmt)->bTemporalCompression = FALSE;
-    (*pmt)->bFixedSizeSamples = FALSE;
-    (*pmt)->lSampleSize = pvi->bmiHeader.biSizeImage;
-    (*pmt)->cbFormat = sizeof(VIDEOINFOHEADER);
-
-    DECLARE_PTR(VIDEO_STREAM_CONFIG_CAPS, pvscc, pSCC);
-
-    pvscc->guid = FORMAT_VideoInfo;
-    pvscc->VideoStandard = AnalogVideo_None;
-    pvscc->InputSize.cx = m_width;
-    pvscc->InputSize.cy = m_height;
-    pvscc->MinCroppingSize.cx = m_width;
-    pvscc->MinCroppingSize.cy = m_height;
-    pvscc->MaxCroppingSize.cx = m_width;
-    pvscc->MaxCroppingSize.cy = m_height;
-    pvscc->CropGranularityX = 80;
-    pvscc->CropGranularityY = 60;
-    pvscc->CropAlignX = 0;
-    pvscc->CropAlignY = 0;
-
-    pvscc->MinOutputSize.cx = m_width;
-    pvscc->MinOutputSize.cy = m_height;
-    pvscc->MaxOutputSize.cx = m_width;
-    pvscc->MaxOutputSize.cy = m_height;
-    pvscc->OutputGranularityX = 0;
-    pvscc->OutputGranularityY = 0;
-    pvscc->StretchTapsX = 0;
-    pvscc->StretchTapsY = 0;
-    pvscc->ShrinkTapsX = 0;
-    pvscc->ShrinkTapsY = 0;
-    pvscc->MinFrameInterval = 200000;   //50 fps
-    pvscc->MaxFrameInterval = 50000000; // 0.2 fps
-    pvscc->MinBitsPerSecond = (80 * 60 * 3 * 8) / 5;
-    pvscc->MaxBitsPerSecond = 640 * 480 * 3 * 8 * 50;
-
-    return S_OK;
+    *pmt = CreateMediaType(nullptr);
+    try {
+        InitMediaType((CMediaType*)*pmt, pSCC);
+        return S_OK;
+    }
+    catch (const std::exception&) {
+        DeleteMediaType(*pmt);
+        *pmt = nullptr;
+        return E_FAIL;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////

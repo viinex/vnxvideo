@@ -79,7 +79,7 @@ private:
     CCritSec m_cSharedState;
     IReferenceClock *m_pClock;
 
-    void InitMediaType();
+    void InitMediaType(CMediaType*, BYTE*);
 private:
     std::mutex m_mutex;
     std::condition_variable m_condition;
