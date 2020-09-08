@@ -394,7 +394,11 @@ public:
     }
 
     void scheduleReconnect() {
-        m_pipe.close();
+        try {
+            m_pipe.close();
+        }
+        catch (const boost::system::system_error&) {
+        }
         {
             std::unique_lock<std::mutex> lock(m_mutex);
             if (!m_running)
