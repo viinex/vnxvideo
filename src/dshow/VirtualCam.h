@@ -78,6 +78,8 @@ private:
     HBITMAP m_hLogoBmp;
     CCritSec m_cSharedState;
     IReferenceClock *m_pClock;
+
+    void InitMediaType();
 private:
     std::mutex m_mutex;
     std::condition_variable m_condition;

@@ -16,8 +16,15 @@
 CUnknown * WINAPI CVCam::CreateInstance(LPUNKNOWN lpunk, HRESULT *phr)
 {
     ASSERT(phr);
-    CUnknown *punk = new CVCam(lpunk, phr);
-    return punk;
+    try {
+        CUnknown* punk = new CVCam(lpunk, phr);
+        return punk;
+    }
+    catch (const std::exception&) {
+        if (!*phr)
+            *phr = E_FAIL;
+        return nullptr;
+    }
 }
 
 CVCam::CVCam(LPUNKNOWN lpunk, HRESULT *phr) :
@@ -51,8 +58,7 @@ CVCamStream::CVCamStream(HRESULT *phr, CVCam *pParent, LPCWSTR pPinName) :
     m_source->Subscribe([this](EColorspace csp, int width, int height) {this->onFormat(csp, width, height); },
         [this](VnxVideo::IRawSample* sample, uint64_t timestamp) {this->onFrame(sample, timestamp); });
     m_source->Run();
-
-    GetMediaType(0, &m_mt);
+    InitMediaType();
 }
 
 void CVCamStream::onFormat(EColorspace csp, int width, int height) {
@@ -130,20 +136,22 @@ HRESULT CVCamStream::FillBuffer(IMediaSample *pms)
     long lDataLen;
     pms->GetPointer(&pData);
     lDataLen = pms->GetSize();
+    long xxx = pms->GetActualDataLength();
 
-    int nplanes;
-    int dststrides[4];
-    ptrdiff_t dstoffsets[4];
-    CRawSample::FillStridesOffsets(EMF_I420, width, height, nplanes, dststrides, dstoffsets, false);
+    int dststrides[4] = { m_width, m_width / 2, m_width / 2, 0 };
+    ptrdiff_t dstoffsets[4] = { 0, m_width * m_height, m_width * m_height * 5 / 4, 0 };
+
     uint8_t* dstplanes[4];
     for (int k = 0; k < 3; ++k)
         dstplanes[k] = pData + dstoffsets[k];
+
     CRawSample::CopyRawToI420(width, height, EMF_I420, planes, strides, dstplanes, dststrides);
 
-    /*
-    for (int i = 0; i < lDataLen; ++i)
-        pData[i] = rand();
-        */
+    //static int j = 0;
+    //++j;
+    //for (int i = 0; i < lDataLen; ++i)
+    //    pData[i] = pData[i] | ((i+j) & 0xf);
+        
 
     //CRefTime graphNow;
     //m_pParent->StreamTime(graphNow);
@@ -178,16 +186,23 @@ HRESULT CVCamStream::SetMediaType(const CMediaType *pmt)
 }
 
 // See Directshow help topic for IAMStreamConfig for details on this method
-HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType *pmt)
+HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType* pmt)
 {
-    if (iPosition < 0) return E_INVALIDARG;
-    if (iPosition > 0) return VFW_S_NO_MORE_ITEMS;
-
-    if (iPosition == 0 && pmt != &m_mt)
+    if (iPosition == 0)
     {
         *pmt = m_mt;
         return S_OK;
     }
+    else if (iPosition > 0) 
+        return VFW_S_NO_MORE_ITEMS;
+    else 
+        return E_INVALIDARG;
+}
+
+void CVCamStream::InitMediaType()
+{
+    m_mt.InitMediaType();
+    CMediaType* pmt = &m_mt;
 
     DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
     ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
@@ -197,14 +212,14 @@ HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType *pmt)
         if (m_csp != EMF_I420)
             m_condition.wait_for(lock, std::chrono::milliseconds(2000));
         if (m_csp != EMF_I420)
-            return -1;
+            throw std::runtime_error("Source colorspace other than I420 not supported");
         pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
         pvi->bmiHeader.biBitCount = 12;
         pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
         pvi->bmiHeader.biWidth = m_width;
         pvi->bmiHeader.biHeight = m_height;
         pvi->bmiHeader.biPlanes = 3;
-        pvi->bmiHeader.biSizeImage = GetBitmapSize(&pvi->bmiHeader);
+        pvi->bmiHeader.biSizeImage = m_width * m_height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
         pvi->bmiHeader.biClrImportant = 0;
     }
 
@@ -219,9 +234,6 @@ HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType *pmt)
 
     pmt->SetSubtype(&MEDIASUBTYPE_IYUV);
     pmt->SetSampleSize(pvi->bmiHeader.biSizeImage);
-
-    return NOERROR;
-
 } // GetMediaType
 
   // This method is called to see if a given output format is supported
@@ -304,7 +316,7 @@ HRESULT STDMETHODCALLTYPE CVCamStream::GetStreamCaps(int iIndex, AM_MEDIA_TYPE *
     pvi->bmiHeader.biWidth = m_width;
     pvi->bmiHeader.biHeight = m_height;
     pvi->bmiHeader.biPlanes = 3;
-    pvi->bmiHeader.biSizeImage = GetBitmapSize(&pvi->bmiHeader);
+    pvi->bmiHeader.biSizeImage = m_width * m_height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
     pvi->bmiHeader.biClrImportant = 0;
 
     SetRectEmpty(&(pvi->rcSource)); // we want the whole image area rendered.
