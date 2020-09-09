@@ -80,7 +80,7 @@ private:
     CCritSec m_cSharedState;
     IReferenceClock *m_pClock;
 
-    void InitMediaType(bool, CMediaType*, BYTE*);
+    void InitMediaType(int, CMediaType*, BYTE*);
 private:
     std::mutex m_mutex;
     std::condition_variable m_condition;
@@ -93,9 +93,16 @@ private:
     int m_height;
     EColorspace m_csp;
 
-    CMediaType m_mtrgb;
     CMediaType m_mtyuv;
-    bool m_rgb;
+    CMediaType m_mtyuv1; // a synonym with different media subtype GUID
+    CMediaType m_mtrgb24;
+    CMediaType m_mtrgb32;
+
+    static const int TOTAL_MEDIATYPES = 4;
+    CMediaType* m_mediatypes[TOTAL_MEDIATYPES];
+
+    int m_selectedMediaType;
+
     std::shared_ptr<SwsContext> m_swsc;
 
     VnxVideo::PVideoSource m_source;
