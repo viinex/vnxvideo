@@ -59,8 +59,14 @@ CVCamStream::CVCamStream(HRESULT *phr, CVCam *pParent, LPCWSTR pPinName) :
         [this](VnxVideo::IRawSample* sample, uint64_t timestamp) {this->onFrame(sample, timestamp); });
     m_source->Run();
 
+    m_rgb = false;
+
     m_mt.InitMediaType();
-    InitMediaType(&m_mt, nullptr);
+    m_mtrgb.InitMediaType();
+    m_mtyuv.InitMediaType();
+    InitMediaType(true, &m_mtrgb, nullptr);
+    InitMediaType(false, &m_mtyuv, nullptr);
+    InitMediaType(false, &m_mt, nullptr);
 }
 
 void CVCamStream::onFormat(EColorspace csp, int width, int height) {
@@ -173,6 +179,12 @@ STDMETHODIMP CVCamStream::Notify(IBaseFilter * pSender, Quality q)
   //////////////////////////////////////////////////////////////////////////
 HRESULT CVCamStream::SetMediaType(const CMediaType *pmt)
 {
+    if (*pmt == m_mtrgb)
+        m_rgb = true;
+    else if (*pmt == m_mtyuv)
+        m_rgb = false;
+    else
+        return VFW_E_TYPE_NOT_ACCEPTED;
     DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->Format());
     HRESULT hr = CSourceStream::SetMediaType(pmt);
     return hr;
@@ -183,7 +195,12 @@ HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType* pmt)
 {
     if (iPosition == 0)
     {
-        *pmt = m_mt;
+        *pmt = m_mtyuv;
+        return S_OK;
+    }
+    else if (iPosition == 1) 
+    {
+        *pmt = m_mtrgb;
         return S_OK;
     }
     else if (iPosition > 0) 
@@ -192,11 +209,46 @@ HRESULT CVCamStream::GetMediaType(int iPosition, CMediaType* pmt)
         return E_INVALIDARG;
 }
 
-void CVCamStream::InitMediaType(CMediaType* pmt, BYTE* pSCC)
-{
+void initMediaTypeCommon(int width, int height, CMediaType* pmt) {
     DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
     ZeroMemory(pvi, sizeof(VIDEOINFOHEADER));
 
+    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    pvi->bmiHeader.biWidth = width;
+    pvi->bmiHeader.biHeight = height;
+    pvi->bmiHeader.biClrImportant = 0;
+
+    pvi->AvgTimePerFrame = 333333; // 100ns
+
+    SetRectEmpty(&(pvi->rcSource)); // we want the whole image area rendered.
+    SetRectEmpty(&(pvi->rcTarget)); // no particular destination rectangle
+
+    pmt->SetType(&MEDIATYPE_Video);
+    pmt->SetFormatType(&FORMAT_VideoInfo);
+    pmt->SetTemporalCompression(FALSE);
+}
+
+void initMediaTypeRGB(int width, int height, CMediaType* pmt) {
+    DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
+    pvi->bmiHeader.biCompression = BI_RGB;
+    pvi->bmiHeader.biBitCount = 24;
+    pvi->bmiHeader.biPlanes = 1;
+    pvi->bmiHeader.biSizeImage = width * height * 3;
+    pmt->SetSubtype(&MEDIASUBTYPE_RGB24);
+}
+
+void initMediaTypeYUV(int width, int height, CMediaType* pmt) {
+    DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
+    pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
+    pvi->bmiHeader.biBitCount = 12;
+    pvi->bmiHeader.biPlanes = 3;
+    pvi->bmiHeader.biSizeImage = width * height * 3 / 2;
+    pmt->SetSubtype(&MEDIASUBTYPE_IYUV);
+}
+
+
+void CVCamStream::InitMediaType(bool rgb, CMediaType* pmt, BYTE* pSCC)
+{
     int width, height;
     EColorspace csp;
 
@@ -211,25 +263,13 @@ void CVCamStream::InitMediaType(CMediaType* pmt, BYTE* pSCC)
         height = m_height;
     }
 
-    pvi->bmiHeader.biCompression = MAKEFOURCC('I', 'Y', 'U', 'V');
-    pvi->bmiHeader.biBitCount = 12;
-    pvi->bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    pvi->bmiHeader.biWidth = width;
-    pvi->bmiHeader.biHeight = height;
-    pvi->bmiHeader.biPlanes = 3;
-    pvi->bmiHeader.biSizeImage = width * height * 3 / 2; // GetBitmapSize(&pvi->bmiHeader);
-    pvi->bmiHeader.biClrImportant = 0;
+    initMediaTypeCommon(width, height, pmt);
+    if (rgb)
+        initMediaTypeRGB(width, height, pmt);
+    else
+        initMediaTypeYUV(width, height, pmt);
 
-    pvi->AvgTimePerFrame = 333333; // 100ns
-
-    SetRectEmpty(&(pvi->rcSource)); // we want the whole image area rendered.
-    SetRectEmpty(&(pvi->rcTarget)); // no particular destination rectangle
-
-    pmt->SetType(&MEDIATYPE_Video);
-    pmt->SetFormatType(&FORMAT_VideoInfo);
-    pmt->SetTemporalCompression(FALSE);
-
-    pmt->SetSubtype(&MEDIASUBTYPE_IYUV);
+    DECLARE_PTR(VIDEOINFOHEADER, pvi, pmt->AllocFormatBuffer(sizeof(VIDEOINFOHEADER)));
     pmt->SetSampleSize(pvi->bmiHeader.biSizeImage);
 
     if (!pSCC)
@@ -270,7 +310,7 @@ void CVCamStream::InitMediaType(CMediaType* pmt, BYTE* pSCC)
 HRESULT CVCamStream::CheckMediaType(const CMediaType *pMediaType)
 {
     VIDEOINFOHEADER *pvi = (VIDEOINFOHEADER *)(pMediaType->Format());
-    if (*pMediaType != m_mt)
+    if (*pMediaType != m_mtrgb && *pMediaType != m_mtyuv)
         return E_INVALIDARG;
     return S_OK;
 } // CheckMediaType
@@ -335,9 +375,15 @@ HRESULT STDMETHODCALLTYPE CVCamStream::GetNumberOfCapabilities(int *piCount, int
 
 HRESULT STDMETHODCALLTYPE CVCamStream::GetStreamCaps(int iIndex, AM_MEDIA_TYPE **pmt, BYTE *pSCC)
 {
-    *pmt = CreateMediaType(nullptr);
     try {
-        InitMediaType((CMediaType*)*pmt, pSCC);
+        if (iIndex == 0) {
+            *pmt = CreateMediaType(&m_mtyuv);
+            InitMediaType(false, (CMediaType*)*pmt, pSCC);
+        }
+        else if (iIndex == 1) {
+            *pmt = CreateMediaType(&m_mtrgb);
+            InitMediaType(true, (CMediaType*)*pmt, pSCC);
+        }
         return S_OK;
     }
     catch (const std::exception&) {

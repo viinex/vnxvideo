@@ -79,7 +79,7 @@ private:
     CCritSec m_cSharedState;
     IReferenceClock *m_pClock;
 
-    void InitMediaType(CMediaType*, BYTE*);
+    void InitMediaType(bool, CMediaType*, BYTE*);
 private:
     std::mutex m_mutex;
     std::condition_variable m_condition;
@@ -91,6 +91,10 @@ private:
     int m_width;
     int m_height;
     EColorspace m_csp;
+
+    CMediaType m_mtrgb;
+    CMediaType m_mtyuv;
+    bool m_rgb;
 
     VnxVideo::PVideoSource m_source;
     void onFormat(EColorspace csp, int width, int height);
