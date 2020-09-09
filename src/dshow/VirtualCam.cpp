@@ -366,8 +366,7 @@ HRESULT CVCamStream::OnThreadCreate()
 
 HRESULT STDMETHODCALLTYPE CVCamStream::SetFormat(AM_MEDIA_TYPE *pmt)
 {
-    //DECLARE_PTR(VIDEOINFOHEADER, pvi, m_mt.pbFormat);
-    //m_mt = *pmt;
+    m_mt = *pmt;
     IPin* pin=nullptr;
     ConnectedTo(&pin);
     if (pin)
@@ -386,7 +385,7 @@ HRESULT STDMETHODCALLTYPE CVCamStream::GetFormat(AM_MEDIA_TYPE **ppmt)
 
 HRESULT STDMETHODCALLTYPE CVCamStream::GetNumberOfCapabilities(int *piCount, int *piSize)
 {
-    *piCount = 1;
+    *piCount = 2;
     *piSize = sizeof(VIDEO_STREAM_CONFIG_CAPS);
     return S_OK;
 }
