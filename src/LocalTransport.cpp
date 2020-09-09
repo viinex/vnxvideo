@@ -514,8 +514,10 @@ public: // IVideoSource
         }
         m_timer.cancel();
         try {
-            m_pipe.cancel();
-            m_pipe.close();
+            if (m_pipe.is_open()) {
+                m_pipe.cancel();
+                m_pipe.close();
+            }
         }
         catch (const std::exception&) {
         }
