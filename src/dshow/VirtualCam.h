@@ -12,6 +12,7 @@
 
 EXTERN_C const GUID CLSID_ViinexVirtualCamera;
 
+struct SwsContext;
 class CVCamStream;
 class CVCam : public CSource
 {
@@ -95,6 +96,7 @@ private:
     CMediaType m_mtrgb;
     CMediaType m_mtyuv;
     bool m_rgb;
+    std::shared_ptr<SwsContext> m_swsc;
 
     VnxVideo::PVideoSource m_source;
     void onFormat(EColorspace csp, int width, int height);

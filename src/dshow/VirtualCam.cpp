@@ -10,6 +10,10 @@
 
 #include "../RawSample.h"
 
+extern "C" {
+#include <libswscale/swscale.h>
+}
+
 //////////////////////////////////////////////////////////////////////////
 //  CVCam is the source filter which masquerades as a capture device
 //////////////////////////////////////////////////////////////////////////
@@ -144,16 +148,30 @@ HRESULT CVCamStream::FillBuffer(IMediaSample *pms)
     long lDataLen;
     pms->GetPointer(&pData);
     lDataLen = pms->GetSize();
-    long xxx = pms->GetActualDataLength();
 
-    int dststrides[4] = { m_width, m_width / 2, m_width / 2, 0 };
-    ptrdiff_t dstoffsets[4] = { 0, m_width * m_height, m_width * m_height * 5 / 4, 0 };
+    if (m_rgb) {
+        if (!m_swsc) {
+            m_swsc.reset(sws_getContext(width, height, AV_PIX_FMT_YUV420P,
+                width, height, AV_PIX_FMT_BGR24, SWS_BILINEAR, nullptr, nullptr, nullptr), sws_freeContext);
+        }
+        uint8_t* dstplanes[4] = { pData + width * (height - 1) * 3,0,0,0 };
+        int dststrides[4] = { -width * 3,0,0,0 };
+        int res = sws_scale(m_swsc.get(), planes, strides, 0, height, dstplanes, dststrides);
+        if (res <= 0) {
 
-    uint8_t* dstplanes[4];
-    for (int k = 0; k < 3; ++k)
-        dstplanes[k] = pData + dstoffsets[k];
+        }
 
-    CRawSample::CopyRawToI420(width, height, EMF_I420, planes, strides, dstplanes, dststrides);
+    }
+    else {
+        int dststrides[4] = { m_width, m_width / 2, m_width / 2, 0 };
+        ptrdiff_t dstoffsets[4] = { 0, m_width * m_height, m_width * m_height * 5 / 4, 0 };
+
+        uint8_t* dstplanes[4];
+        for (int k = 0; k < 3; ++k)
+            dstplanes[k] = pData + dstoffsets[k];
+
+        CRawSample::CopyRawToI420(width, height, EMF_I420, planes, strides, dstplanes, dststrides);
+    }
 
     REFERENCE_TIME now = (timestamp - m_timestamp0) * 10000; // milliseconds to 100 nanoseconds
     REFERENCE_TIME endThisFrame = now + avgFrameTime;
