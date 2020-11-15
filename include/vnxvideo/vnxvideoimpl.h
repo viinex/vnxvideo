@@ -174,11 +174,11 @@ namespace VnxVideo
     VNXVIDEO_DECLSPEC IRenderer* CreateRenderer(int refresh_rate);
 
     VNXVIDEO_DECLSPEC IVideoSource *CreateLocalVideoClient(const char* name);
-    VNXVIDEO_DECLSPEC IRawProc *CreateLocalVideoProvider(const char* name);
+    VNXVIDEO_DECLSPEC IRawProc *CreateLocalVideoProvider(const char* name, int maxSizeMB);
 
     VNXVIDEO_DECLSPEC IRawProc *CreateDisplay(int width, int height, const char* name, std::function<void(void)> onClose);
 
-    VNXVIDEO_DECLSPEC void WithPreferredShmAllocator(const char* name, std::function<void(void)> action);
+    VNXVIDEO_DECLSPEC void WithPreferredShmAllocator(const char* name, int maxSizeMB, std::function<void(void)> action);
 
     class CVmsChannelSelector;
 

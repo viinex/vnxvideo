@@ -185,13 +185,13 @@ extern "C" {
         uint8_t* backgroundColor, vnxvideo_raw_sample_t backgroundImage);
     VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_nosignal(vnxvideo_renderer_t renderer, vnxvideo_raw_sample_t nosignalImage);
 
-    VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, vnxvideo_action_t action, void* usrptr);
+    VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, int maxSizeMB, vnxvideo_action_t action, void* usrptr);
     VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_ptr(vnxvideo_allocator_t allocator, vnxvideo_action_t action, void* usrptr);
     VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_duplicate(vnxvideo_allocator_t* allocator);
     VNXVIDEO_DECLSPEC void vnxvideo_shm_allocator_free(vnxvideo_allocator_t allocator);
 
     VNXVIDEO_DECLSPEC int vnxvideo_local_client_create(const char* name, vnxvideo_videosource_t* out);
-    VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, vnxvideo_rawproc_t* out);
+    VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, int maxSizeMB, vnxvideo_rawproc_t* out);
 
     typedef int (*vnxvideo_h264_source_create_t)(const char* json_config, vnxvideo_h264_source_t* source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_subscribe(vnxvideo_h264_source_t source,

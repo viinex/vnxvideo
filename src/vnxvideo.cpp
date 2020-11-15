@@ -764,9 +764,9 @@ VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_nosignal(vnxvideo_renderer_t rendere
 }
 
 
-VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, vnxvideo_action_t action, void* usrptr) {
+VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, int maxSizeMB, vnxvideo_action_t action, void* usrptr) {
     try {
-        VnxVideo::WithPreferredShmAllocator(name, std::bind(action, usrptr));
+        VnxVideo::WithPreferredShmAllocator(name, maxSizeMB, std::bind(action, usrptr));
         return 0;
     }
     catch (const std::exception& e) {
@@ -809,9 +809,9 @@ VNXVIDEO_DECLSPEC int vnxvideo_local_client_create(const char* name, vnxvideo_vi
         return vnxvideo_err_invalid_parameter;
     }
 }
-VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, vnxvideo_rawproc_t* out) {
+VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, int maxSizeMB, vnxvideo_rawproc_t* out) {
     try {
-        out->ptr = VnxVideo::CreateLocalVideoProvider(name);
+        out->ptr = VnxVideo::CreateLocalVideoProvider(name, maxSizeMB);
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {

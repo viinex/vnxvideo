@@ -81,7 +81,7 @@ class CLocalVideoProvider : public VnxVideo::IRawProc {
 private:
 
 public:
-    CLocalVideoProvider(const std::string& address, PShmAllocator allocator= PShmAllocator())
+    CLocalVideoProvider(const std::string& address, int maxSizeMB, PShmAllocator allocator= PShmAllocator())
         : m_address(address)
         , m_allocator(allocator) 
         , m_timestamp(0)
@@ -91,7 +91,7 @@ public:
 #endif
     {
         if (!m_allocator.get()) {
-            m_allocator.reset(CreateShmAllocator(address.c_str()));
+            m_allocator.reset(CreateShmAllocator(address.c_str(), maxSizeMB));
         }
         auto pios(&m_ios);
         bind();
@@ -532,7 +532,7 @@ namespace VnxVideo {
         return new CLocalVideoClient(name);
     }
 
-    IRawProc *CreateLocalVideoProvider(const char* name) {
-        return new CLocalVideoProvider(name, DupPreferredShmAllocator());
+    IRawProc *CreateLocalVideoProvider(const char* name, int maxSizeMB) {
+        return new CLocalVideoProvider(name, maxSizeMB, DupPreferredShmAllocator());
     }
 }

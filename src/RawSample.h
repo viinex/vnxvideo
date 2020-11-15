@@ -29,7 +29,7 @@ typedef std::shared_ptr<IShmAllocator> PShmAllocator;
 
 extern IAllocator* const g_privateAllocator;
 
-IShmAllocator *CreateShmAllocator(const char* name);
+IShmAllocator *CreateShmAllocator(const char* name, int maxSizeMB);
 IShmMapping* CreateShmMapping(const char* name);
 
 void WithPreferredShmAllocator(IShmAllocator* allocator, std::function<void(void)> action);

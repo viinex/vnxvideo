@@ -42,9 +42,9 @@ const std::string ShmNamePrefix("viinex_shm_");
 
 class CShmAllocator : public IShmAllocator {
 public:
-    CShmAllocator(const char* name) 
+    CShmAllocator(const char* name, int maxSizeMB)
     {
-        const uint32_t maxSize = 1024 * 1024 * 32;
+        const uint32_t maxSize = 1024 * 1024 * maxSizeMB;
         const std::string mappingName(ShmNamePrefix + name);
 #ifndef _WIN32
 		boost::interprocess::shared_memory_object::remove(mappingName.c_str());
@@ -64,7 +64,7 @@ public:
         }
         catch (const boost::interprocess::bad_alloc& e) {
             // just return empty pointer
-            VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "CShmAllocator::Alloc() failed: " << e.what();
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CShmAllocator::Alloc() failed: " << e.what();
         }
         return res;
     }
@@ -105,8 +105,8 @@ private:
 };
 
 
-IShmAllocator *CreateShmAllocator(const char* name) {
-    return new CShmAllocator(name);
+IShmAllocator *CreateShmAllocator(const char* name, int maxSizeMB) {
+    return new CShmAllocator(name, maxSizeMB);
 }
 
 IShmMapping* CreateShmMapping(const char* name) {
@@ -142,8 +142,8 @@ PShmAllocator DupPreferredShmAllocator() {
 }
 
 namespace VnxVideo {
-    void WithPreferredShmAllocator(const char* name, std::function<void(void)> action) {
-        PShmAllocator allocator(CreateShmAllocator(name));
+    void WithPreferredShmAllocator(const char* name, int maxSizeMB, std::function<void(void)> action) {
+        PShmAllocator allocator(CreateShmAllocator(name, maxSizeMB));
         WithPreferredShmAllocator(allocator.get(), action);
     }
 }
