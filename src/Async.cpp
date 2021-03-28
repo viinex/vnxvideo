@@ -17,7 +17,7 @@ public:
     void SetFormat(EColorspace csp, int width, int height) {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_busy)
-            m_cond.wait(lock);
+            m_cond.wait_for(lock, std::chrono::milliseconds(200));
         m_impl->SetFormat(csp, width, height);
     }
     void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
@@ -29,7 +29,7 @@ public:
     void Flush() {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_busy)
-            m_cond.wait(lock);
+            m_cond.wait_for(lock, std::chrono::milliseconds(200));
         m_impl->Flush();
     }
     ~CAsyncProc() {
@@ -59,6 +59,7 @@ protected:
             
             lock.lock();
             m_busy = false;
+            m_cond.notify_all();
         }
     }
 protected:
@@ -97,7 +98,7 @@ public:
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_busy && m_continue)
-            m_cond.wait(lock);
+            m_cond.wait_for(lock, std::chrono::milliseconds(200));
         m_impl->Subscribe(onFormat, onFrame);
     }
 private:
