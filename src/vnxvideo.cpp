@@ -478,6 +478,16 @@ int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder) {
         return vnxvideo_err_invalid_parameter;
     }
 }
+int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder) {
+    try {
+        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegHEVC();
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_decoder_create: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
 void vnxvideo_decoder_free(vnxvideo_decoder_t decoder) {
     auto p = reinterpret_cast<VnxVideo::IVideoDecoder*>(decoder.ptr);
     delete p;

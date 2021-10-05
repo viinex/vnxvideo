@@ -199,4 +199,7 @@ namespace VnxVideo {
     VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpegH264() {
         return new CVideoDecoder(AV_CODEC_ID_H264);
     }
+    VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpegHEVC() {
+        return new CVideoDecoder(AV_CODEC_ID_HEVC);
+    }
 }

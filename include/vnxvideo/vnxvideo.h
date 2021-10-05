@@ -165,6 +165,7 @@ extern "C" {
         vnxvideo_on_raw_sample_t handle_sample, void* usrptr_data);
 
     VNXVIDEO_DECLSPEC int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder);
+    VNXVIDEO_DECLSPEC int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder);
     VNXVIDEO_DECLSPEC void vnxvideo_decoder_free(vnxvideo_decoder_t decoder);
     VNXVIDEO_DECLSPEC int vnxvideo_decoder_subscribe(vnxvideo_decoder_t decoder,
         vnxvideo_on_frame_format_t handle_format, void* usrptr_format,
