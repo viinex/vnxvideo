@@ -99,6 +99,16 @@ namespace VnxVideo
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc);
 
+    class IMediaSource {
+    public:
+        virtual ~IMediaSource() {}
+        virtual void SubscribeMedia(EMediaSubtype mediaSubtype, TOnBufferCallback onBuffer) = 0;
+        virtual void SubscribeJson(TOnJsonCallback onJson) = 0;
+        virtual void Run() = 0;
+        virtual void Stop() = 0;
+    };
+
+    // to be deprecated
     class IH264VideoSource {
     public:
         virtual ~IH264VideoSource() {}
@@ -108,6 +118,9 @@ namespace VnxVideo
         virtual void Subscribe(TOnJsonCallback onJson) {}
     };
     // created by factory functions exposed from plugins
+
+    VNXVIDEO_DECLSPEC IH264VideoSource* CreateH264VideoSourceFromMediaSource(IMediaSource*);
+    VNXVIDEO_DECLSPEC IMediaSource* CreateMediaSourceFromH264VideoSource(IH264VideoSource*);
 
     class IRawTransform : public IRawProc {
     public:

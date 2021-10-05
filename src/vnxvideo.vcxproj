@@ -187,6 +187,7 @@
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="vnxvideo.cpp" />
     <ClCompile Include="Win32Utils.cpp" />
+    <ClCompile Include="WrapCastMediaSource.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\include\vnxvideo\BufferImpl.h" />

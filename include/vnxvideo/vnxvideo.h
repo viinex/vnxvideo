@@ -30,6 +30,7 @@ extern "C" {
     typedef struct { void* ptr; } vnxvideo_rawproc_t; // raw processor - a superclass
     typedef struct { void* ptr; } vnxvideo_h264_encoder_t;
     typedef struct { void* ptr; } vnxvideo_h264_source_t;
+    typedef struct { void* ptr; } vnxvideo_media_source_t;
     typedef struct { void* ptr; } vnxvideo_composer_t;
     typedef struct { void* ptr; } vnxvideo_analytics_t; // video analysis
     typedef struct { void* ptr; } vnxvideo_imganalytics_t; // still image analysis, with no respect to timestamps and previous history
@@ -48,6 +49,9 @@ extern "C" {
     const int vnxvideo_err_not_implemented = -1;
     const int vnxvideo_err_invalid_parameter = -2;
     const int vnxvideo_err_external_api = -3;
+
+    // coded media subtypes
+    typedef enum { EMST_H264 = 0, EMST_HEVC = 1, EMST_AAC = 16 } EMediaSubtype;
 
     // a few supported media formats
     // https://msdn.microsoft.com/en-us/library/ms867704.aspx
@@ -194,14 +198,33 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_local_client_create(const char* name, vnxvideo_videosource_t* out);
     VNXVIDEO_DECLSPEC int vnxvideo_local_server_create(const char* name, int maxSizeMB, vnxvideo_rawproc_t* out);
 
+    // to be deprecated {{
     typedef int (*vnxvideo_h264_source_create_t)(const char* json_config, vnxvideo_h264_source_t* source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_subscribe(vnxvideo_h264_source_t source,
         vnxvideo_on_buffer_t handle_data, void* usrptr); // each data buffer is a NAL unit
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_events_subscribe(vnxvideo_h264_source_t source,
-        vnxvideo_on_json_t handle_event, void* usrptr); // each buffer is JSON value
+        vnxvideo_on_json_t handle_event, void* usrptr); // each buffer is a JSON value
     VNXVIDEO_DECLSPEC void vnxvideo_h264_source_free(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_start(vnxvideo_h264_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_source_stop(vnxvideo_h264_source_t source);
+    // }}
+
+    // Coded media source. One source may actually represent/output several streams of different media types.
+    // This is only an interface, it's up to users and implementers to decide how to use this convention.
+    typedef int (*vnxvideo_media_source_create_t)(const char* json_config, vnxvideo_media_source_t* source);
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_subscribe(vnxvideo_media_source_t source,
+        EMediaSubtype media_subtype, vnxvideo_on_buffer_t handle_data, void* usrptr);
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_events_subscribe(vnxvideo_media_source_t source,
+        vnxvideo_on_json_t handle_event, void* usrptr); // each buffer is JSON value
+    VNXVIDEO_DECLSPEC void vnxvideo_media_source_free(vnxvideo_media_source_t source);
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_start(vnxvideo_media_source_t source);
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_stop(vnxvideo_media_source_t source);
+
+    // wrap a media source to have interface of h264 video source and vice versa.
+    // ownership of object passed as an argument will be owned by resulting object.
+    VNXVIDEO_DECLSPEC vnxvideo_h264_source_t  vnxvideo_media_source_to_h264(vnxvideo_media_source_t);
+    VNXVIDEO_DECLSPEC vnxvideo_media_source_t vnxvideo_h264_source_to_media(vnxvideo_h264_source_t);
+
 
     typedef int (*vnxvideo_vmsplugin_create_t)(const char* json_config, vnxvideo_vmsplugin_t* vmsplugin);
     VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_free(vnxvideo_vmsplugin_t vmsplugin);

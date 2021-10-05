@@ -414,7 +414,77 @@ int vnxvideo_h264_source_stop(vnxvideo_h264_source_t source) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_source_stop: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
+}
 
+int vnxvideo_media_source_subscribe(vnxvideo_media_source_t source,
+    EMediaSubtype media_subtype, vnxvideo_on_buffer_t handle_data, void* usrptr) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        if (handle_data != nullptr)
+            s->SubscribeMedia(media_subtype, [=](VnxVideo::IBuffer* b, uint64_t ts) { handle_data(usrptr, vnxvideo_buffer_t{ b }, ts); });
+        else
+            s->SubscribeMedia(media_subtype, [](VnxVideo::IBuffer* b, uint64_t ts) {});
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_subscribe: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+int vnxvideo_media_source_events_subscribe(vnxvideo_media_source_t source,
+    vnxvideo_on_json_t handle_event, void* usrptr) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        if (handle_event != nullptr)
+            s->SubscribeJson([=](const std::string& json, uint64_t ts) {
+            handle_event(usrptr, json.c_str(), json.size(), ts);
+                });
+        else
+            s->SubscribeJson([](const std::string&, uint64_t) {});
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_events_subscribe: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+void vnxvideo_media_source_free(vnxvideo_media_source_t source) {
+    auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+    delete s;
+}
+int vnxvideo_media_source_start(vnxvideo_media_source_t source) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        s->Run();
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_start: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+int vnxvideo_media_source_stop(vnxvideo_media_source_t source) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        s->Stop();
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_stop: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
+
+vnxvideo_h264_source_t vnxvideo_media_source_to_h264(vnxvideo_media_source_t src) {
+    vnxvideo_h264_source_t res;
+    res.ptr = VnxVideo::CreateH264VideoSourceFromMediaSource(reinterpret_cast<VnxVideo::IMediaSource*>(src.ptr));
+    return res;
+}
+vnxvideo_media_source_t vnxvideo_h264_source_to_media(vnxvideo_h264_source_t src) {
+    vnxvideo_media_source_t res;
+    res.ptr = VnxVideo::CreateMediaSourceFromH264VideoSource(reinterpret_cast<VnxVideo::IH264VideoSource*>(src.ptr));
+    return res;
 }
 
 
