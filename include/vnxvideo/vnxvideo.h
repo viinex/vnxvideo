@@ -51,7 +51,7 @@ extern "C" {
     const int vnxvideo_err_external_api = -3;
 
     // coded media subtypes
-    typedef enum { EMST_H264 = 0, EMST_HEVC = 1, EMST_AAC = 16 } EMediaSubtype;
+    typedef enum { EMST_ANY = 0, EMST_H264 = 1, EMST_HEVC = 2, EMST_AAC = 16 } EMediaSubtype;
 
     // a few supported media formats
     // https://msdn.microsoft.com/en-us/library/ms867704.aspx

@@ -10,10 +10,10 @@
 // In Viinex it can be used as:
 
 //  {
-//      "type": "h264sourceplugin",
+//      "type": "mediasourceplugin",
 //      "name" : "cam2",
 //      "library" : "vnxvideo.dll",
-//      "factory" : "create_media_file_live_source",
+//      "factory" : "create_file_media_source",
 //      "init" : {
 //          "file": "I:\\My Drive\\temp\\64e134fa-f94d-4548-8dea-784f156e04d4.MP4"
 //      }
@@ -47,11 +47,10 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
-class CMediaFileLiveSource : public VnxVideo::IH264VideoSource {
+class CMediaFileLiveSource : public VnxVideo::IMediaSource {
 public:
     CMediaFileLiveSource(const json& config)
         : m_running(false)
-        , m_onBuffer([](VnxVideo::IBuffer*, uint64_t) {})
         , m_onJson([](const std::string&, uint64_t) {})
         , m_stream(-1)
         , m_streamText(-1)
@@ -66,11 +65,17 @@ public:
 
         reopenFile();
     }
-    virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
+    virtual void SubscribeMedia(EMediaSubtype mediaSubtype, VnxVideo::TOnBufferCallback onBuffer) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        m_onBuffer = onBuffer;
+        if(mediaSubtype!=EMST_ANY)
+            m_onBuffer[mediaSubtype] = onBuffer;
+        else {
+            m_onBuffer[EMST_H264] = onBuffer;
+            m_onBuffer[EMST_HEVC] = onBuffer;
+            m_onBuffer[EMST_AAC] = onBuffer;
+        }
     }
-    virtual void Subscribe(VnxVideo::TOnJsonCallback onJson) {
+    virtual void SubscribeJson(VnxVideo::TOnJsonCallback onJson) {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_onJson = onJson;
     }
@@ -106,9 +111,21 @@ private:
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource ctor: file " + m_filePath + " found; " <<
             m_ctx->nb_streams << " stream(s) recognized in it";
         for (unsigned int k = 0; k < m_ctx->nb_streams; ++k) {
-            if (AV_CODEC_ID_H264 == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_stream)) {
+            if (AV_CODEC_ID_H264 == m_ctx->streams[k]->codecpar->codec_id && m_stream == -1) {
+                m_streams[k] = EMST_H264;
                 m_stream = k;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is H264 video of resolution "
+                    << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
+            }
+            else if (AV_CODEC_ID_HEVC == m_ctx->streams[k]->codecpar->codec_id && m_stream == -1) {
+                m_streams[k] = EMST_HEVC;
+                m_stream = k;
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is HEVC video of resolution "
+                    << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
+            }
+            else if (AV_CODEC_ID_AAC == m_ctx->streams[k]->codecpar->codec_id) {
+                m_streams[k] = EMST_AAC;
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is HEVC video of resolution "
                     << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
             }
             else if (AV_CODEC_ID_MOV_TEXT == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_streamText)) {
@@ -118,12 +135,14 @@ private:
             else
                 m_ctx->streams[k]->discard = AVDISCARD_ALL;
         }
-        if (-1 == m_stream)
-            throw std::runtime_error("Could not find appropriate H264 video stream in " + m_filePath);
+        if (m_stream == -1)
+            throw std::runtime_error("Could not find appropriate H264 or HEVC video stream in " + m_filePath);
 
-        extractParamSets();
-        if (m_sps.empty() || m_pps.empty()) {
-            throw std::runtime_error("CMediaFileLiveSource::extractParamSets(): unable to parse parameter sets from " + m_filePath);
+        if (m_streams[m_stream] == EMST_H264) {
+            extractParamSets();
+            if (m_sps.empty() || m_pps.empty()) {
+                throw std::runtime_error("CMediaFileLiveSource::extractParamSets(): unable to parse parameter sets from " + m_filePath);
+            }
         }
     }
     void doRun() {
@@ -183,14 +202,27 @@ private:
                     }
                     if (!m_running)
                         break;
-                    auto onBuffer = m_onBuffer;
+                    auto itMediaSubtype = this->m_streams.find(p.stream_index);
+                    if (itMediaSubtype == m_streams.end()) {
+                        av_packet_unref(&p);
+                        continue;
+                    }
+                    const EMediaSubtype mediaSubtype = itMediaSubtype->second;
+                    auto itOnBuffer = m_onBuffer.find(mediaSubtype);
+                    if (itOnBuffer == m_onBuffer.end()) {
+                        av_packet_unref(&p);
+                        continue;
+                    }
+                    auto onBuffer = itOnBuffer->second;
                     lock.unlock();
                     try {
-                        if (p.flags & AV_PKT_FLAG_KEY) {
-                            CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
-                            onBuffer(&sps, ts);
-                            CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
-                            onBuffer(&pps, ts);
+                        if (mediaSubtype == EMST_H264) {
+                            if (p.flags & AV_PKT_FLAG_KEY) {
+                                CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
+                                onBuffer(&sps, ts);
+                                CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
+                                onBuffer(&pps, ts);
+                            }
                         }
                         int pos = 0;
                         while (pos < p.size) {
@@ -217,12 +249,14 @@ private:
                 }
             }
             if (!m_loop) {
-                auto onBuffer = m_onBuffer;
-                lock.unlock();
                 try {
-                    static uint8_t endOfStreamNal[] = { 11 };
-                    CNoOwnershipNalBuffer nalu(endOfStreamNal, 1);
-                    m_onBuffer(&nalu, m_prevTs);
+                    if (m_streams[m_stream] == EMST_H264) {
+                        static uint8_t endOfStreamNal[] = { 11 };
+                        auto onBuffer = m_onBuffer[EMST_H264];
+                        lock.unlock();
+                        CNoOwnershipNalBuffer nalu(endOfStreamNal, 1);
+                        onBuffer(&nalu, m_prevTs);
+                    }
                 }
                 catch (const std::exception& e) {
                     VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer final callback: "
@@ -336,12 +370,13 @@ private:
     std::thread m_thread;
     std::condition_variable m_condition;
     
-    VnxVideo::TOnBufferCallback m_onBuffer;
+    std::map<EMediaSubtype, VnxVideo::TOnBufferCallback> m_onBuffer;
     VnxVideo::TOnJsonCallback m_onJson;
     bool m_running;
 
     std::shared_ptr<AVFormatContext> m_ctx;
-    int m_stream; // index of the appropriate video stream in the file
+    std::map<int, EMediaSubtype> m_streams;
+    int m_stream; // index of a video stream
     int m_streamText; // index of appropriate text stream in the file
     std::vector<uint8_t> m_sps;
     std::vector<uint8_t> m_pps;
@@ -350,7 +385,7 @@ private:
 };
 
 extern "C" VNXVIDEO_DECLSPEC
-int create_media_file_live_source(const char* json_config, vnxvideo_h264_source_t* source) {
+int create_file_media_source(const char* json_config, vnxvideo_h264_source_t* source) {
     try {
         json j;
         std::string s(json_config);
@@ -360,7 +395,25 @@ int create_media_file_live_source(const char* json_config, vnxvideo_h264_source_
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on create_file_media_source: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
+// backwards compatibility
+extern "C" VNXVIDEO_DECLSPEC
+int create_media_file_live_source(const char* json_config, vnxvideo_h264_source_t* source) {
+    try {
+        json j;
+        std::string s(json_config);
+        std::stringstream ss(s);
+        ss >> j;
+        source->ptr = VnxVideo::CreateH264VideoSourceFromMediaSource(new CMediaFileLiveSource(j));
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on create_media_file_live_source: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
+
 }
