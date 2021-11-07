@@ -125,8 +125,7 @@ private:
             }
             else if (AV_CODEC_ID_AAC == m_ctx->streams[k]->codecpar->codec_id) {
                 m_streams[k] = EMST_AAC;
-                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is HEVC video of resolution "
-                    << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is AAC audio";
             }
             else if (AV_CODEC_ID_MOV_TEXT == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_streamText)) {
                 m_streamText = k;

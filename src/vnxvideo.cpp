@@ -540,7 +540,7 @@ int vnxvideo_raw_sample_from_bmp(const uint8_t* data, int size, vnxvideo_raw_sam
 
 int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder) {
     try {
-        decoder->ptr = VnxVideo::CreateVideoDecoder_OpenH264();
+        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -554,7 +554,7 @@ int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder) {
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_decoder_create: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_hevc_decoder_create: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
 }
