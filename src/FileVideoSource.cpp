@@ -55,11 +55,19 @@ public:
         , m_stream(-1)
         , m_streamText(-1)
         , m_tsDiff(0)
+        , m_prevTs(0)
     {
         if (!mjget(config, "file", m_filePath))
             throw std::runtime_error("mandatory `file' parameter is missing from config");
         m_loop = jget(config, "loop", true);
         m_speed = jget(config, "speed", 1.0);
+        if (0.0 == m_speed) {
+            m_speed = 1.0;
+            m_realtime = false;
+        }
+        else {
+            m_realtime = true;
+        }
 
         static int avregistered = avregister();
 
@@ -83,7 +91,6 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_running)
             throw std::runtime_error("CMediaFileLiveSource is already running");
-        m_prevTs = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
         m_running = true;
         m_thread = std::move(std::thread(&CMediaFileLiveSource::doRun, this));
     }
@@ -143,6 +150,12 @@ private:
                 throw std::runtime_error("CMediaFileLiveSource::extractParamSets(): unable to parse parameter sets from " + m_filePath);
             }
         }
+        resetTimestamps();
+    }
+    void resetTimestamps() {
+        m_tsDiff = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        m_prevTs = m_tsDiff;
+        m_pts0 = AV_NOPTS_VALUE;
     }
     void doRun() {
         AVRational time_base(m_ctx->streams[m_stream]->time_base);
@@ -162,13 +175,16 @@ private:
                     continue;
                 }
             }
+            else {
+                resetTimestamps();
+            }
             AVPacket p;
             while (m_running) {
                 memset(&p, 0, sizeof p);
                 if (0 == av_read_frame(m_ctx.get(), &p)) {
                     if (p.stream_index == m_streamText) {
                         if (p.size >= 2) {
-                            int len = int(p.data[0])*256+int(p.data[1]);
+                            int len = int(p.data[0]) * 256 + int(p.data[1]);
                             if (p.size == 2 + len) {
                                 std::string text(p.data + 2, p.data + 2 + len);
                                 json j;
@@ -182,21 +198,26 @@ private:
                         av_packet_unref(&p);
                         continue;
                     }
-                    uint64_t ts = m_tsDiff + (p.pts == AV_NOPTS_VALUE)?(m_prevTs+40):(p.pts*time_base.num * 1000 / time_base.den);
-                    uint64_t diffTimeMilliseconds = ts - m_prevTs;
-                    if (m_prevTs > 0){
-                        if (diffTimeMilliseconds > 10 && diffTimeMilliseconds < 1000) {
-                            uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-                            if (now > ts)
-                                diffTimeMilliseconds = 10;
-                            else
-                                diffTimeMilliseconds = std::min(diffTimeMilliseconds, ts - now);
-                            if(m_speed != 0)
-                                m_condition.wait_for(lock, std::chrono::milliseconds((long long)round(diffTimeMilliseconds / m_speed)));
+
+                    uint64_t ts;
+                    if (p.pts == AV_NOPTS_VALUE)
+                        ts = m_prevTs + (40.0 / m_speed); // a made-up value to cope with files not containing timestamps
+                    else {
+                        if (m_pts0 == AV_NOPTS_VALUE) {
+                            m_pts0 = p.pts;
                         }
-                        else {
-                            m_tsDiff = m_prevTs + 40 - ts;
-                            ts = m_prevTs + 40;
+                        uint64_t pts = p.pts - m_pts0;
+                        ts = m_tsDiff + pts * time_base.num * 1000.0 / (time_base.den * m_speed);
+                    }
+
+                    {
+                        if (ts > m_prevTs) {
+                            uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+                            if (ts > now) {
+                                uint64_t diffTimeMilliseconds = ts - now;
+                                if (m_realtime && diffTimeMilliseconds)
+                                    m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
+                            }
                         }
                     }
                     if (!m_running)
@@ -236,7 +257,7 @@ private:
                         }
                     }
                     catch (const std::exception& e) {
-                        VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer callback: " 
+                        VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::doRun() got an exception from onBuffer callback: "
                             << e.what();
                     }
                     lock.lock();
@@ -309,10 +330,10 @@ private:
                 return k;
         return length;
     }
-    static void extractParamSetsStream(const uint8_t* extradata, int extradata_size, 
+    static void extractParamSetsStream(const uint8_t* extradata, int extradata_size,
         std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
         int d;
-        while(d = startcode(extradata)) {
+        while (d = startcode(extradata)) {
             extradata += d;
             extradata_size -= d;
             int n = findstartcode(extradata, extradata_size);
@@ -364,6 +385,7 @@ private:
     std::string m_filePath;
     bool m_loop;
     double m_speed;
+    bool m_realtime;
 
     std::mutex m_mutex;
     std::thread m_thread;
@@ -381,6 +403,7 @@ private:
     std::vector<uint8_t> m_pps;
     uint64_t m_prevTs;
     uint64_t m_tsDiff;
+    uint64_t m_pts0;
 };
 
 extern "C" VNXVIDEO_DECLSPEC
