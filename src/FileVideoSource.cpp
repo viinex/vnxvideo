@@ -43,6 +43,8 @@ using json = nlohmann::json;
 #include <condition_variable>
 #include <codecvt>
 
+#include <boost/asio.hpp> // ntoh
+
 extern "C" {
 #include <libavformat/avformat.h>
 }
@@ -145,9 +147,15 @@ private:
             throw std::runtime_error("Could not find appropriate H264 or HEVC video stream in " + m_filePath);
 
         if (m_streams[m_stream] == EMST_H264) {
-            extractParamSets();
+            extractH264ParamSets();
             if (m_sps.empty() || m_pps.empty()) {
-                throw std::runtime_error("CMediaFileLiveSource::extractParamSets(): unable to parse parameter sets from " + m_filePath);
+                throw std::runtime_error("CMediaFileLiveSource::extractH264ParamSets(): unable to parse H264 parameter sets from " + m_filePath);
+            }
+        }
+        else if (m_streams[m_stream] == EMST_HEVC) {
+            extractHEVCParamSets();
+            if (m_vps.empty() || m_sps.empty() || m_pps.empty()) {
+                throw std::runtime_error("CMediaFileLiveSource::extractHEVCParamSets(): unable to parse HEVC parameter sets from " + m_filePath);
             }
         }
         resetTimestamps();
@@ -243,17 +251,42 @@ private:
                                 CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
                                 onBuffer(&pps, ts);
                             }
+                            int pos = 0;
+                            while (pos < p.size) {
+                                // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
+                                // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
+                                int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
+                                if (1 == len)
+                                    len = p.size - 4;
+                                CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                                onBuffer(&nalu, ts);
+                                pos += len + 4;
+                            }
                         }
-                        int pos = 0;
-                        while (pos < p.size) {
-                            // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
-                            // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
-                            int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
-                            if (1 == len)
-                                len = p.size - 4;
-                            CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                        else if (mediaSubtype == EMST_HEVC) {
+                            if (p.flags & AV_PKT_FLAG_KEY) {
+                                CNoOwnershipNalBuffer vps(&m_vps[0], m_vps.size());
+                                onBuffer(&vps, ts);
+                                CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
+                                onBuffer(&sps, ts);
+                                CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
+                                onBuffer(&pps, ts);
+                            }
+                            int pos = 0;
+                            while (pos < p.size) {
+                                // there'll be either NAL unit separator 0,0,0,1 in case of h265 stream (raw or TS),
+                                // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
+                                int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
+                                if (1 == len)
+                                    len = p.size - 4;
+                                CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                                onBuffer(&nalu, ts);
+                                pos += len + 4;
+                            }
+                        }
+                        else if (mediaSubtype == EMST_AAC) {
+                            CNoOwnershipNalBuffer nalu(p.data, p.size);
                             onBuffer(&nalu, ts);
-                            pos += len + 4;
                         }
                     }
                     catch (const std::exception& e) {
@@ -297,90 +330,160 @@ private:
     }
 
     // Unfortunatly we'll have to manually extract SPS and PPS from "extradata" which is stored by avformat.
-    void extractParamSets() {
+    void extractH264ParamSets() {
         m_sps.clear();
         m_pps.clear();
         const uint8_t* extradata = m_ctx->streams[m_stream]->codecpar->extradata;
         int extradata_size = m_ctx->streams[m_stream]->codecpar->extradata_size;
         if (extradata_size < 8) {
-            VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractParamSets(): unable to parse parameter sets from extradata of length "
+            VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractH264ParamSets(): unable to parse parameter sets from extradata of length "
                 << std::to_string(extradata_size);
             return;
         }
-        if (startcode(extradata))
-            extractParamSetsStream(extradata, extradata_size, m_sps, m_pps);
+        if (H264ParamSets::startcode(extradata))
+            H264ParamSets::extractParamSetsStream(extradata, extradata_size, m_sps, m_pps);
         else
-            extractParamSetsAvcC(extradata, extradata_size, m_sps, m_pps);
+            H264ParamSets::extractParamSetsAvcC(extradata, extradata_size, m_sps, m_pps);
     }
-    // There'll be a few ugly utility functions for parsing some of H264 stream
-    inline static int startcode(const uint8_t* p) {
-        if (p[0] == 0 && p[1] == 0)
-            if (p[2] == 1)
-                return 3;
-            else if (p[2] == 0 && p[3] == 1)
-                return 4;
+    class H264ParamSets { // There'll be a few ugly utility functions for parsing some of H264 stream
+
+    public:
+        inline static int startcode(const uint8_t* p) {
+            if (p[0] == 0 && p[1] == 0)
+                if (p[2] == 1)
+                    return 3;
+                else if (p[2] == 0 && p[3] == 1)
+                    return 4;
+                else
+                    return 0;
             else
                 return 0;
-        else
-            return 0;
-    }
-    static int findstartcode(const uint8_t* data, int length) {
-        for (int k = 0; k < length - 5; ++k)
-            if (startcode(data + k))
-                return k;
-        return length;
-    }
-    static void extractParamSetsStream(const uint8_t* extradata, int extradata_size,
-        std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
-        int d;
-        while (d = startcode(extradata)) {
-            extradata += d;
-            extradata_size -= d;
-            int n = findstartcode(extradata, extradata_size);
-            if ((extradata[0] & 0x1f) == 7)
-                sps.assign(extradata, extradata + n);
-            else if ((extradata[0] & 0x1f) == 8)
-                pps.assign(extradata, extradata + n);
-            if (n < extradata_size - 5) {
-                extradata += n;
-                extradata_size -= n;
+        }
+        static int findstartcode(const uint8_t* data, int length) {
+            for (int k = 0; k < length - 5; ++k)
+                if (startcode(data + k))
+                    return k;
+            return length;
+        }
+        static void extractParamSetsStream(const uint8_t* extradata, int extradata_size,
+            std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
+            int d;
+            while (d = startcode(extradata)) {
+                extradata += d;
+                extradata_size -= d;
+                int n = findstartcode(extradata, extradata_size);
+                if ((extradata[0] & 0x1f) == 7)
+                    sps.assign(extradata, extradata + n);
+                else if ((extradata[0] & 0x1f) == 8)
+                    pps.assign(extradata, extradata + n);
+                if (n < extradata_size - 5) {
+                    extradata += n;
+                    extradata_size -= n;
+                }
             }
         }
-    }
-    static void extractParamSetsAvcC(const uint8_t* extradata, int extradata_size,
-        std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
-        if (extradata_size < 8)
-            return;
-        if (extradata[0] != 1)
-            return;
-        uint8_t ssz = extradata[4] & 3;
-        uint8_t nsps = extradata[5] & 31;
-        extradata += 6;
-        extradata_size -= 6;
-
-        for (int k = 0; k < nsps; ++k) {
-            uint16_t spssz = (((uint16_t)extradata[0]) << 8) + extradata[1];
-            if (extradata_size < spssz + 2)
+        static void extractParamSetsAvcC(const uint8_t* extradata, int extradata_size,
+            std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
+            if (extradata_size < 8)
                 return;
-            sps.assign(extradata + 2, extradata + 2 + spssz);
-            extradata += 2 + spssz;
-            extradata_size -= 2 + spssz;
-        }
-        if (extradata_size < 4)
-            return;
-
-        uint8_t npps = extradata[0];
-        extradata += 1;
-        extradata_size -= 1;
-        for (int k = 0; k < npps; ++k) {
-            uint16_t ppssz = (((uint16_t)extradata[0]) << 8) + extradata[1];
-            if (extradata_size < ppssz + 2)
+            if (extradata[0] != 1)
                 return;
-            pps.assign(extradata + 2, extradata + 2 + ppssz);
-            extradata += 2 + ppssz;
-            extradata_size -= 2 + ppssz;
+            uint8_t ssz = extradata[4] & 3;
+            uint8_t nsps = extradata[5] & 31;
+            extradata += 6;
+            extradata_size -= 6;
+
+            for (int k = 0; k < nsps; ++k) {
+                uint16_t spssz = (((uint16_t)extradata[0]) << 8) + extradata[1];
+                if (extradata_size < spssz + 2)
+                    return;
+                sps.assign(extradata + 2, extradata + 2 + spssz);
+                extradata += 2 + spssz;
+                extradata_size -= 2 + spssz;
+            }
+            if (extradata_size < 4)
+                return;
+
+            uint8_t npps = extradata[0];
+            extradata += 1;
+            extradata_size -= 1;
+            for (int k = 0; k < npps; ++k) {
+                uint16_t ppssz = (((uint16_t)extradata[0]) << 8) + extradata[1];
+                if (extradata_size < ppssz + 2)
+                    return;
+                pps.assign(extradata + 2, extradata + 2 + ppssz);
+                extradata += 2 + ppssz;
+                extradata_size -= 2 + ppssz;
+            }
         }
+    };
+    void extractHEVCParamSets() {
+        m_vps.clear();
+        m_sps.clear();
+        m_pps.clear();
+        const uint8_t* extradata = m_ctx->streams[m_stream]->codecpar->extradata;
+        // extradata is expected to be the body of hvcC box acc.to ISO/IEC 14496-15:2019
+        // syntax described in sec. 8.3.3.1.2.
+        int extradata_size = m_ctx->streams[m_stream]->codecpar->extradata_size;
+        uint16_t offset = 22;
+        if (extradata_size < offset+1) {
+            VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractHEVCParamSets(): unable to parse parameter sets from extradata of length "
+                << std::to_string(extradata_size);
+            return;
+        }
+        uint8_t numOfArrays = extradata[offset];
+        ++offset;
+        std::vector<std::vector<uint8_t> > vps, sps, pps;
+        while (numOfArrays) {
+            if (extradata_size < offset + 3) {
+                VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractHEVCParamSets(): insufficient extradata length to parse nalu type or number in array";
+                return;
+            }
+            const uint8_t naluType = extradata[offset] & 0x3f;
+            ++offset;
+            const uint16_t numNalus = ntohs(*reinterpret_cast<const uint16_t*>(extradata + offset));
+            offset += 2;
+            for (int k = 0; k < numNalus; ++k) {
+                if (extradata_size < offset + 2) {
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractHEVCParamSets(): insufficient extradata length to parse nalu length";
+                    return;
+                }
+                const uint16_t nalUnitLength = ntohs(*reinterpret_cast<const uint16_t*>(extradata + offset));
+                offset += 2;
+                if (extradata_size < offset + nalUnitLength) {
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractHEVCParamSets(): insufficient extradata length to extract nalu";
+                    return;
+                }
+                std::vector<uint8_t> nalu(extradata + offset, extradata + offset + nalUnitLength);
+                switch (naluType) {
+                case 32: 
+                    vps.push_back(nalu);
+                    break;
+                case 33:
+                    sps.push_back(nalu);
+                    break;
+                case 34:
+                    pps.push_back(nalu);
+                    break;
+                }
+                offset += nalUnitLength;
+            }
+            --numOfArrays;
+        }
+        if (vps.size() != 1 || sps.size() != 1 || pps.size() != 1) {
+            VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "CMediaFileLiveSource::extractHEVCParamSets(): unexpeted number of parameter sets were extracted: "
+                << vps.size() << " vps; "
+                << sps.size() << " sps; "
+                << pps.size() << " pps.";
+        }
+        if (!vps.empty())
+            m_vps = vps[0];
+        if (!sps.empty())
+            m_sps = sps[0];
+        if (!pps.empty())
+            m_pps = pps[0];
     }
+
 private:
     std::string m_filePath;
     bool m_loop;
@@ -399,6 +502,7 @@ private:
     std::map<int, EMediaSubtype> m_streams;
     int m_stream; // index of a video stream
     int m_streamText; // index of appropriate text stream in the file
+    std::vector<uint8_t> m_vps;
     std::vector<uint8_t> m_sps;
     std::vector<uint8_t> m_pps;
     uint64_t m_prevTs;
@@ -407,7 +511,7 @@ private:
 };
 
 extern "C" VNXVIDEO_DECLSPEC
-int create_file_media_source(const char* json_config, vnxvideo_h264_source_t* source) {
+int create_file_media_source(const char* json_config, vnxvideo_media_source_t* source) {
     try {
         json j;
         std::string s(json_config);
