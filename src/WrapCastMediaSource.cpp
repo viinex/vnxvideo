@@ -35,6 +35,12 @@ public:
     virtual void Stop() {
         m_impl->Stop();
     }
+    virtual std::vector<EMediaSubtype> EnumMediatypes() {
+        return { EMST_H264 };
+    }
+    virtual VnxVideo::IBuffer* GetExtradata(EMediaSubtype mediaSubtype) {
+        return nullptr;
+    }
 };
 
 namespace VnxVideo {

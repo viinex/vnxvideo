@@ -5,9 +5,9 @@
 
 class CNalBuffer : public VnxVideo::IBuffer {
     std::shared_ptr<uint8_t> m_data;
-    int m_size;
+    size_t m_size;
 public:
-    CNalBuffer(uint8_t *data, int size)
+    CNalBuffer(uint8_t *data, size_t size)
         : m_data((uint8_t*)malloc(size), free)
         , m_size(size)
     {
@@ -17,7 +17,7 @@ public:
     }
     void GetData(uint8_t* &data, int& size) {
         data = m_data.get();
-        size = m_size;
+        size = (int)m_size;
     }
     VnxVideo::IBuffer* Dup() {
         return new CNalBuffer(*this);
@@ -25,16 +25,16 @@ public:
 };
 class CNoOwnershipNalBuffer : public VnxVideo::IBuffer {
     uint8_t* m_data;
-    int m_size;
+    size_t m_size;
 public:
-    CNoOwnershipNalBuffer(uint8_t *data, int size)
+    CNoOwnershipNalBuffer(uint8_t *data, size_t size)
         : m_data(data)
         , m_size(size)
     {
     }
     void GetData(uint8_t* &data, int& size) {
         data = m_data;
-        size = m_size;
+        size = (int)m_size;
     }
     VnxVideo::IBuffer* Dup() {
         return new CNalBuffer(m_data, m_size);

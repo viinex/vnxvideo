@@ -40,7 +40,6 @@ void ffmpeglog(void*, int level, const char* format, va_list args) {
 void vnxvideo_init_ffmpeg(ELogLevel level) {
     av_log_set_level(loglevel2ffmpeg(level));
     av_log_set_callback(ffmpeglog);
-    avcodec_register_all();
 }
 
 
@@ -127,7 +126,7 @@ public:
         , m_width(0)
         , m_height(0)
     {
-        AVCodec* codec = avcodec_find_decoder(codecID);
+        const AVCodec* codec = avcodec_find_decoder(codecID);
         if (nullptr == codec)
             throw std::runtime_error("avcodec_find_decoder failed");
         m_cc.reset(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
@@ -169,7 +168,7 @@ private:
     void fetchDecoded() {
         while (0 == avcodec_receive_frame(m_cc.get(), m_result.GetAVFrame())) {
             callOnFormat(m_result.GetAVFrame());
-            m_onFrame(&m_result, m_result.GetAVFrame()->pkt_pts); // pkt_pts said to be deprecated but it's the only valid value
+            m_onFrame(&m_result, m_result.GetAVFrame()->pts); // pkt_pts said to be deprecated but it's the only valid value
         }
     }
     void callOnFormat(AVFrame* f) {

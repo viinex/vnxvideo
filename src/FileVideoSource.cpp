@@ -71,8 +71,6 @@ public:
             m_realtime = true;
         }
 
-        static int avregistered = avregister();
-
         reopenFile();
     }
     virtual void SubscribeMedia(EMediaSubtype mediaSubtype, VnxVideo::TOnBufferCallback onBuffer) {
@@ -106,6 +104,22 @@ public:
         if (m_thread.get_id() != std::this_thread::get_id())
             m_thread.join();
     }
+    virtual std::vector<EMediaSubtype> EnumMediatypes() {
+        std::vector<EMediaSubtype> res;
+        std::unique_lock<std::mutex> lock(m_mutex);
+        for (auto v : m_extradata) {
+            res.push_back(v.first);
+        }
+        return res;
+    }
+    virtual VnxVideo::IBuffer* GetExtradata(EMediaSubtype mediaSubtype) {
+        std::unique_lock<std::mutex> lock(m_mutex);
+        auto it(m_extradata.find(mediaSubtype));
+        if (it == m_extradata.end())
+            return nullptr;
+        else
+            return new CNalBuffer(&it->second[0], it->second.size());
+    }
 private:
     void reopenFile() {
         AVFormatContext* ctx(nullptr);
@@ -120,20 +134,26 @@ private:
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource ctor: file " + m_filePath + " found; " <<
             m_ctx->nb_streams << " stream(s) recognized in it";
         for (unsigned int k = 0; k < m_ctx->nb_streams; ++k) {
-            if (AV_CODEC_ID_H264 == m_ctx->streams[k]->codecpar->codec_id && m_stream == -1) {
+            auto codecpar = m_ctx->streams[k]->codecpar;
+            std::vector<uint8_t> extradata(codecpar->extradata, codecpar->extradata + codecpar->extradata_size);
+
+            if (AV_CODEC_ID_H264 == codecpar->codec_id && m_stream == -1) {
                 m_streams[k] = EMST_H264;
                 m_stream = k;
+                m_extradata[EMST_H264] = extradata;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is H264 video of resolution "
                     << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
             }
             else if (AV_CODEC_ID_HEVC == m_ctx->streams[k]->codecpar->codec_id && m_stream == -1) {
                 m_streams[k] = EMST_HEVC;
                 m_stream = k;
+                m_extradata[EMST_HEVC] = extradata;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is HEVC video of resolution "
                     << m_ctx->streams[k]->codecpar->width << 'x' << m_ctx->streams[k]->codecpar->height;
             }
             else if (AV_CODEC_ID_AAC == m_ctx->streams[k]->codecpar->codec_id) {
                 m_streams[k] = EMST_AAC;
+                m_extradata[EMST_AAC] = extradata;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is AAC audio";
             }
             else if (AV_CODEC_ID_MOV_TEXT == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_streamText)) {
@@ -169,7 +189,7 @@ private:
         AVRational time_base(m_ctx->streams[m_stream]->time_base);
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_running) {
-            int res = av_seek_frame(m_ctx.get(), m_stream, m_ctx->streams[m_stream]->first_dts, AVSEEK_FLAG_FRAME);
+            int res = av_seek_frame(m_ctx.get(), m_stream, m_ctx->streams[m_stream]->start_time, AVSEEK_FLAG_FRAME);
             if (0 != res) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::doRun() failed to seek to the very first frame:"
                     << averr2str(res);
@@ -209,13 +229,13 @@ private:
 
                     uint64_t ts;
                     if (p.pts == AV_NOPTS_VALUE)
-                        ts = m_prevTs + (40.0 / m_speed); // a made-up value to cope with files not containing timestamps
+                        ts = m_prevTs + uint64_t(40.0 / m_speed); // a made-up value to cope with files not containing timestamps
                     else {
                         if (m_pts0 == AV_NOPTS_VALUE) {
                             m_pts0 = p.pts;
                         }
                         uint64_t pts = p.pts - m_pts0;
-                        ts = m_tsDiff + pts * time_base.num * 1000.0 / (time_base.den * m_speed);
+                        ts = m_tsDiff + uint64_t(pts * time_base.num * 1000.0 / (time_base.den * m_speed));
                     }
 
                     {
@@ -323,10 +343,6 @@ private:
         char buf[AV_ERROR_MAX_STRING_SIZE];
         av_strerror(err, buf, AV_ERROR_MAX_STRING_SIZE);
         return buf;
-    }
-    inline static int avregister() {
-        av_register_all();
-        return 0;
     }
 
     // Unfortunatly we'll have to manually extract SPS and PPS from "extradata" which is stored by avformat.
@@ -502,6 +518,7 @@ private:
     std::map<int, EMediaSubtype> m_streams;
     int m_stream; // index of a video stream
     int m_streamText; // index of appropriate text stream in the file
+    std::map<EMediaSubtype, std::vector<uint8_t>> m_extradata;
     std::vector<uint8_t> m_vps;
     std::vector<uint8_t> m_sps;
     std::vector<uint8_t> m_pps;

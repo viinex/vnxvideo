@@ -175,7 +175,7 @@ public:
             // otherwise it's canceled and we do nothing
         }
         else {
-            conn->read += n;
+            conn->read += (int)n;
             if (conn->read == sizeof(conn->in)) {
                 const uint64_t command = conn->in[0];
                 const uint64_t argument = conn->in[1];
@@ -219,7 +219,7 @@ public:
         m_sample->GetData(m.strides, planes);
         uint8_t* p0 = planes[0];
         for (int k = 0; k < 4; ++k)
-            m.offsets[k] = planes[k] - p0;
+            m.offsets[k] = (int)(planes[k] - p0);
 
         uint64_t pointer = m_allocator->FromPointer(planes[0]);
         m.pointer = pointer;

@@ -288,6 +288,6 @@ namespace VnxVideo {
         std::shared_ptr<uint8_t> data((uint8_t*)malloc(sz), free);
         ifs.seekg(0, std::ios_base::beg);
         ifs.read((char*)data.get(), sz);
-        return ParseBMP(data.get(), sz);
+        return ParseBMP(data.get(), (int)sz);
     }
 }

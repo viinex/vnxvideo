@@ -51,7 +51,7 @@ extern "C" {
     const int vnxvideo_err_external_api = -3;
 
     // coded media subtypes
-    typedef enum { EMST_ANY = 0, EMST_H264 = 1, EMST_HEVC = 2, EMST_AAC = 16 } EMediaSubtype;
+    typedef enum { EMST_ANY = 0, EMST_H264 = 1, EMST_HEVC = 2, EMST_AAC = 16, EMST_OPUS = 32 } EMediaSubtype;
 
     // a few supported media formats
     // https://msdn.microsoft.com/en-us/library/ms867704.aspx
@@ -219,6 +219,17 @@ extern "C" {
     VNXVIDEO_DECLSPEC void vnxvideo_media_source_free(vnxvideo_media_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_media_source_start(vnxvideo_media_source_t source);
     VNXVIDEO_DECLSPEC int vnxvideo_media_source_stop(vnxvideo_media_source_t source);
+    // Enumerate media(sub)types produced by this media source.
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_enum_mediatypes(vnxvideo_media_source_t source,
+        EMediaSubtype* buffer, int buffer_size_bytes, int* count);
+    // Get extradata for a stream of a given media subtype.
+    // Extradata is a set of stream/encoder/source parameters or config, 
+    // sometimes repeated in-band (like VPS/SPS/PPS for H.26[45]),
+    // but sometimes not (like AudioSpecificConfig data for AAC).
+    // Extradata should be returned in FFmpeg-like format, that is body of avcC/hvcC 
+    // mp4 boxes for H264/H265 video, or 14496-3-encoded AudioSpecificConfig for AAC. 
+    VNXVIDEO_DECLSPEC int vnxvideo_media_source_get_extradata(vnxvideo_media_source_t source,
+        EMediaSubtype media_subtype, vnxvideo_buffer_t* buffer); // may return NULL as buffer->ptr
 
     // wrap a media source to have interface of h264 video source and vice versa.
     // ownership of object passed as an argument will be owned by resulting object.

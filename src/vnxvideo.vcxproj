@@ -116,7 +116,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swscale.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(AMBASE_HOME)\x64\$(Configuration);$(IPP_HOME)\lib\intel64;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>vnxvideo.def</ModuleDefinitionFile>
     </Link>
@@ -160,7 +160,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>avcodec.lib;avformat.lib;avutil.lib;swscale.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(AMBASE_HOME)\x64\$(Configuration);$(IPP_HOME)\lib\intel64;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
       <ModuleDefinitionFile>vnxvideo.def</ModuleDefinitionFile>
     </Link>

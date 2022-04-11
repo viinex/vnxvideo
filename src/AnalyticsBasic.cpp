@@ -340,7 +340,7 @@ private:
                 ippiCountInRange_8u_C1R(m_motionLabel.get() + x*cellW + y*m_stride*cellH, m_stride, { cellW, cellH },
                     &count, 1, 255);
                 m_motionCells[motionCellsH*y + x] = count;
-                const int cellCountThreshold = std::min<int>(cellSize/2, std::max<int>(1, (int)ceil(cellSize) * (1.0 - detect_motion) * 0.2));
+                const int cellCountThreshold = std::min<int>(cellSize/2, std::max<int>(1, int(ceil(cellSize) * (1.0 - detect_motion) * 0.2)));
                 if (count >= cellCountThreshold) {
                     m_status.motionMask |= (1UL << x) << (y*motionCellsH);
                     ++motionCellsActive;

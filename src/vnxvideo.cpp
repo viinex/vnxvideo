@@ -15,6 +15,7 @@ using json = nlohmann::json;
 #include "vnxvideologimpl.h"
 
 #include "RawSample.h"
+#include "BufferImpl.h"
 #include "VmsChannelSelector.h"
 
 namespace NVnxVideoLogImpl {
@@ -107,7 +108,7 @@ int vnxvideo_enumerate_video_sources(vnxvideo_manager_t mgr, int details, char* 
 
         wss << res << std::ends;
         if (0 == json_buffer || 0 == buffer_size) {
-            return wss.str().size();
+            return (int)wss.str().size();
         }
         if (wss.str().size() >= (size_t)buffer_size) {
             return vnxvideo_err_invalid_parameter;
@@ -378,7 +379,7 @@ int vnxvideo_h264_source_events_subscribe(vnxvideo_h264_source_t source,
         auto s = reinterpret_cast<VnxVideo::IH264VideoSource*>(source.ptr);
         if (handle_event != nullptr)
             s->Subscribe([=](const std::string& json, uint64_t ts) { 
-                handle_event(usrptr, json.c_str(), json.size(), ts);
+                handle_event(usrptr, json.c_str(), (int)json.size(), ts);
             });
         else
             s->Subscribe([](const std::string&, uint64_t) {});
@@ -437,7 +438,7 @@ int vnxvideo_media_source_events_subscribe(vnxvideo_media_source_t source,
         auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
         if (handle_event != nullptr)
             s->SubscribeJson([=](const std::string& json, uint64_t ts) {
-            handle_event(usrptr, json.c_str(), json.size(), ts);
+            handle_event(usrptr, json.c_str(), (int)json.size(), ts);
                 });
         else
             s->SubscribeJson([](const std::string&, uint64_t) {});
@@ -467,6 +468,35 @@ int vnxvideo_media_source_stop(vnxvideo_media_source_t source) {
     try {
         auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
         s->Stop();
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_stop: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+int vnxvideo_media_source_enum_mediatypes(vnxvideo_media_source_t source,
+    EMediaSubtype* buffer, int buffer_size_bytes, int* count) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        auto res = s->EnumMediatypes();
+        if (res.size() * sizeof(EMediaSubtype) < buffer_size_bytes) {
+            return (int)res.size() * sizeof(EMediaSubtype);
+        }
+        *count = (int)res.size();
+        std::copy(res.begin(), res.end(), buffer);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_media_source_stop: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+int vnxvideo_media_source_get_extradata(vnxvideo_media_source_t source,
+    EMediaSubtype media_subtype, vnxvideo_buffer_t* buffer) {
+    try {
+        auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
+        buffer->ptr = s->GetExtradata(media_subtype);
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -637,7 +667,7 @@ int vnxvideo_analytics_subscribe(vnxvideo_analytics_t analytics,
     try {
         auto a = reinterpret_cast<VnxVideo::IAnalytics*>(analytics.ptr);
         if (handle_json && handle_binary) {
-            auto hj = [=](const std::string& s, uint64_t ts) { handle_json(usrptr_json, s.c_str(), s.size(), ts); };
+            auto hj = [=](const std::string& s, uint64_t ts) { handle_json(usrptr_json, s.c_str(), (int)s.size(), ts); };
             auto hb = [=](VnxVideo::IBuffer* b, uint64_t ts) { handle_binary(usrptr_binary, vnxvideo_buffer_t{ b }, ts); };
             a->Subscribe(hj, hb);
         }
@@ -715,7 +745,7 @@ int vnxvideo_imganalytics_process(vnxvideo_imganalytics_t ian, vnxvideo_raw_samp
         else {
             memcpy(json_buffer, r.c_str(), r.size());
         }
-        *buffer_size = r.size();
+        *buffer_size = (int)r.size();
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -954,7 +984,7 @@ VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_archive_timeline(vnxvideo_vmsplugin
             timelinePlain[k * 2 + 1] = timeline[k].second;
         }
         auto ptr = timelinePlain.empty() ? nullptr : (const uint8_t*)&timelinePlain[0];
-        return vnxvideo_buffer_copy_wrap(ptr, timelinePlain.size()*sizeof(uint64_t), intervals);
+        return vnxvideo_buffer_copy_wrap(ptr, int(timelinePlain.size()*sizeof(uint64_t)), intervals);
     }
     catch (const std::exception& e) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_vmsplugin_get_archive_timeline: " << e.what();

@@ -106,6 +106,8 @@ namespace VnxVideo
         virtual void SubscribeJson(TOnJsonCallback onJson) = 0;
         virtual void Run() = 0;
         virtual void Stop() = 0;
+        virtual std::vector<EMediaSubtype> EnumMediatypes() = 0;
+        virtual VnxVideo::IBuffer* GetExtradata(EMediaSubtype mediaSubtype) = 0; // may return nullptr
     };
 
     // to be deprecated
