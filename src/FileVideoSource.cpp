@@ -156,6 +156,11 @@ private:
                 m_extradata[EMST_AAC] = extradata;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is AAC audio";
             }
+            else if (AV_CODEC_ID_OPUS == m_ctx->streams[k]->codecpar->codec_id) {
+                m_streams[k] = EMST_OPUS;
+                m_extradata[EMST_OPUS] = extradata;
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is Opus audio";
+            }
             else if (AV_CODEC_ID_MOV_TEXT == m_ctx->streams[k]->codecpar->codec_id && (-1 == m_streamText)) {
                 m_streamText = k;
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::reopenFile(): stream #" << k << " is a MOV_TEXT (subtitles) stream";

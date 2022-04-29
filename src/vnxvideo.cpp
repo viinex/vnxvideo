@@ -480,7 +480,7 @@ int vnxvideo_media_source_enum_mediatypes(vnxvideo_media_source_t source,
     try {
         auto s = reinterpret_cast<VnxVideo::IMediaSource*>(source.ptr);
         auto res = s->EnumMediatypes();
-        if (res.size() * sizeof(EMediaSubtype) < buffer_size_bytes) {
+        if (buffer_size_bytes < res.size() * sizeof(EMediaSubtype)) {
             return (int)res.size() * sizeof(EMediaSubtype);
         }
         *count = (int)res.size();
