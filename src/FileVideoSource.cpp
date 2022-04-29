@@ -191,7 +191,6 @@ private:
         m_pts0 = AV_NOPTS_VALUE;
     }
     void doRun() {
-        AVRational time_base(m_ctx->streams[m_stream]->time_base);
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_running) {
             int res = av_seek_frame(m_ctx.get(), m_stream, m_ctx->streams[m_stream]->start_time, AVSEEK_FLAG_FRAME);
@@ -232,6 +231,8 @@ private:
                         continue;
                     }
 
+                    AVRational time_base(m_ctx->streams[p.stream_index]->time_base);
+
                     uint64_t ts;
                     if (p.pts == AV_NOPTS_VALUE)
                         ts = m_prevTs + uint64_t(40.0 / m_speed); // a made-up value to cope with files not containing timestamps
@@ -243,7 +244,7 @@ private:
                         ts = m_tsDiff + uint64_t(pts * time_base.num * 1000.0 / (time_base.den * m_speed));
                     }
 
-                    {
+                    if(p.stream_index == m_stream) { // only wait for "main" stream
                         if (ts > m_prevTs) {
                             uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
                             if (ts > now) {
@@ -252,6 +253,7 @@ private:
                                     m_condition.wait_for(lock, std::chrono::milliseconds(diffTimeMilliseconds));
                             }
                         }
+                        m_prevTs = ts;
                     }
                     if (!m_running)
                         break;
@@ -320,7 +322,6 @@ private:
                     }
                     lock.lock();
                     av_packet_unref(&p);
-                    m_prevTs = ts;
                 }
                 else {
                     break;
