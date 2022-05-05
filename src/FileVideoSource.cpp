@@ -97,7 +97,7 @@ public:
     virtual void Stop() {
         std::unique_lock<std::mutex> lock(m_mutex);
         if (!m_running)
-            throw std::runtime_error("CMediaFileLiveSource is not running and cannot be stopped");
+            return;
         m_running = false;
         m_condition.notify_all();
         lock.unlock();
@@ -291,14 +291,6 @@ private:
                             }
                         }
                         else if (mediaSubtype == EMST_HEVC) {
-                            if (p.flags & AV_PKT_FLAG_KEY) {
-                                CNoOwnershipNalBuffer vps(&m_vps[0], m_vps.size());
-                                onBuffer(&vps, ts);
-                                CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
-                                onBuffer(&sps, ts);
-                                CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
-                                onBuffer(&pps, ts);
-                            }
                             int pos = 0;
                             while (pos < p.size) {
                                 // there'll be either NAL unit separator 0,0,0,1 in case of h265 stream (raw or TS),
@@ -306,12 +298,25 @@ private:
                                 int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
                                 if (1 == len)
                                     len = p.size - 4;
+
+                                if (len > 0) {
+                                    uint8_t typ = (p.data[pos + 4] & 0x7e) >> 1;
+                                    if (typ >= 16 && typ <= 21) { // send vps/sps/pps before every irap frame
+                                        CNoOwnershipNalBuffer vps(&m_vps[0], m_vps.size());
+                                        onBuffer(&vps, ts);
+                                        CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
+                                        onBuffer(&sps, ts);
+                                        CNoOwnershipNalBuffer pps(&m_pps[0], m_pps.size());
+                                        onBuffer(&pps, ts);
+                                    }
+                                }
+
                                 CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
                                 onBuffer(&nalu, ts);
                                 pos += len + 4;
                             }
                         }
-                        else if (mediaSubtype == EMST_AAC) {
+                        else if (mediaSubtype == EMST_AAC || mediaSubtype == EMST_OPUS) {
                             CNoOwnershipNalBuffer nalu(p.data, p.size);
                             onBuffer(&nalu, ts);
                         }
