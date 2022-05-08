@@ -166,9 +166,12 @@ public:
     }
 private:
     void fetchDecoded() {
-        while (0 == avcodec_receive_frame(m_cc.get(), m_result.GetAVFrame())) {
-            callOnFormat(m_result.GetAVFrame());
-            m_onFrame(&m_result, m_result.GetAVFrame()->pts); // pkt_pts said to be deprecated but it's the only valid value
+        for(;;){
+            CAvcodecRawSample result;
+            if (0 != avcodec_receive_frame(m_cc.get(), result.GetAVFrame()))
+                return;
+            callOnFormat(result.GetAVFrame());
+            m_onFrame(&result, result.GetAVFrame()->pts); // pkt_pts said to be deprecated but it's the only valid value
         }
     }
     void callOnFormat(AVFrame* f) {
@@ -187,11 +190,6 @@ private:
     VnxVideo::TOnFrameCallback m_onFrame;
     EColorspace m_csp;
     int m_width, m_height;
-
-    CAvcodecRawSample m_result; // this is just an optimization for not calling
-    // av_frame_alloc/av_frame_free on each decoded frame.
-    // this m_result should not be used by anyone except Decode() 
-    // when reading the decoding results out
 };
 
 namespace VnxVideo {
