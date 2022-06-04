@@ -84,6 +84,12 @@
     <ClCompile Include="WrapCastMediaSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Audio.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="FFmpegUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="RawSample.h">
@@ -124,6 +130,9 @@
     </ClInclude>
     <ClInclude Include="..\include\vnxvideo\VmsChannelSelector.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FFmpegUtils.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

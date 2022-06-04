@@ -9,39 +9,7 @@ extern "C" {
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 
-
-ELogLevel ffmpeg2loglevel(int level) {
-    if (level <= AV_LOG_ERROR)
-        return VNXLOG_ERROR;
-    else if (level <= AV_LOG_WARNING)
-        return VNXLOG_WARNING;
-    else if (level <= AV_LOG_INFO)
-        return VNXLOG_INFO;
-    else
-        return VNXLOG_HIGHEST; // we do not want ffmpeg debug output really
-}
-int loglevel2ffmpeg(ELogLevel level) {
-    switch (level) {
-    case VNXLOG_NONE: return AV_LOG_QUIET;
-    case VNXLOG_ERROR: return AV_LOG_ERROR;
-    case VNXLOG_WARNING: return AV_LOG_WARNING;
-    case VNXLOG_INFO: return AV_LOG_INFO;
-    case VNXLOG_DEBUG: return AV_LOG_INFO; // no debug logs from ffmpeg //AV_LOG_VERBOSE;
-    default: return AV_LOG_INFO;
-    }
-}
-
-void ffmpeglog(void*, int level, const char* format, va_list args) {
-    char buf[256];
-    buf[255] = 0;
-    VNXVIDEO_LOG(ffmpeg2loglevel(level), "ffmpeg") << NVnxVideoLogImpl::removecrlf(vsnprintf(buf, 255, format, args), buf);
-}
-
-void vnxvideo_init_ffmpeg(ELogLevel level) {
-    av_log_set_level(loglevel2ffmpeg(level));
-    av_log_set_callback(ffmpeglog);
-}
-
+#include "FFmpegUtils.h"
 
 inline EColorspace fromAVPixelFormat(AVPixelFormat format) {
     switch (format) {
@@ -121,21 +89,11 @@ private:
 class CVideoDecoder : public VnxVideo::IVideoDecoder {
 public:
     CVideoDecoder(AVCodecID codecID) 
-        : m_codecID(codecID)
+        : m_cc(createAvDecoderContext(codecID))
         , m_csp(EMF_NONE)
         , m_width(0)
         , m_height(0)
     {
-        const AVCodec* codec = avcodec_find_decoder(codecID);
-        if (nullptr == codec)
-            throw std::runtime_error("avcodec_find_decoder failed");
-        m_cc.reset(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
-        int res = avcodec_open2(m_cc.get(), codec, 0);
-        if(res<0)
-            throw std::runtime_error("avcodec_open2 failed");
-        m_cc->flags |= AV_CODEC_FLAG_LOW_DELAY;
-        m_cc->flags2 |= AV_CODEC_FLAG2_CHUNKS;
-        m_cc->flags2 |= AV_CODEC_FLAG2_FAST;
     }
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
         m_onFormat = onFormat;
@@ -184,7 +142,6 @@ private:
         }
     }
 private:
-    const AVCodecID m_codecID;
     std::shared_ptr<AVCodecContext> m_cc;
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;

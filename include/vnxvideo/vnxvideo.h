@@ -38,6 +38,7 @@ extern "C" {
 
     typedef struct { void* ptr; } vnxvideo_decoder_t;
     typedef struct { void* ptr; } vnxvideo_renderer_t;
+    typedef struct { void* ptr; } vnxvideo_transcoder_t;
 
     typedef struct { void* ptr; } vnxvideo_vmsplugin_t;
 #pragma pack(pop)
@@ -55,10 +56,11 @@ extern "C" {
         EMST_ANY = 0, 
         EMST_H264 = 1, 
         EMST_HEVC = 2, 
-        EMST_PCMU = 16, 
-        EMST_PCMA = 32,
+        EMST_PCMU = 16, // default RTP details: 8 bps 8000 samples per second
+        EMST_PCMA = 32, // same as above
         EMST_OPUS = 64,
         EMST_AAC = 128,
+        EMST_WAV = 256, // default 16 bps signed le 48000 samples per second
     } EMediaSubtype;
 
     // a few supported media formats
@@ -244,6 +246,14 @@ extern "C" {
     VNXVIDEO_DECLSPEC vnxvideo_h264_source_t  vnxvideo_media_source_to_h264(vnxvideo_media_source_t);
     VNXVIDEO_DECLSPEC vnxvideo_media_source_t vnxvideo_h264_source_to_media(vnxvideo_h264_source_t);
 
+    VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(int channels,
+        EMediaSubtype input, const char* inputDetails,
+        EMediaSubtype output, const char* outputDetails,
+        vnxvideo_transcoder_t* transcoder);
+    VNXVIDEO_DECLSPEC void vnxvideo_transcoder_free(vnxvideo_transcoder_t transcoder);
+    VNXVIDEO_DECLSPEC int vnxvideo_transcoder_subscribe(vnxvideo_transcoder_t transcoder,
+        vnxvideo_on_buffer_t handle_data, void* usrptr);
+    VNXVIDEO_DECLSPEC int vnxvideo_transcoder_process(vnxvideo_transcoder_t transcoder, vnxvideo_buffer_t buffer, uint64_t timestamp);
 
     typedef int (*vnxvideo_vmsplugin_create_t)(const char* json_config, vnxvideo_vmsplugin_t* vmsplugin);
     VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_free(vnxvideo_vmsplugin_t vmsplugin);

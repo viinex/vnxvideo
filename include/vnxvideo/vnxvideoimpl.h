@@ -99,6 +99,16 @@ namespace VnxVideo
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc);
 
+    class ITranscoder {
+    public:
+        virtual ~ITranscoder() {}
+        virtual void Subscribe(TOnBufferCallback onBuffer) = 0;
+        virtual void Process(IBuffer* buf, uint64_t timestamp) = 0;
+    };
+    VNXVIDEO_DECLSPEC ITranscoder* CreateAudioTranscoder(int channels, 
+        EMediaSubtype input, const char* inputDetails,
+        EMediaSubtype output, const char* outputDetails);
+
     class IMediaSource {
     public:
         virtual ~IMediaSource() {}

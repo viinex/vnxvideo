@@ -169,6 +169,7 @@
     <ClCompile Include="Allocator.cpp" />
     <ClCompile Include="AnalyticsBasic.cpp" />
     <ClCompile Include="Async.cpp" />
+    <ClCompile Include="Audio.cpp" />
     <ClCompile Include="BufferCopy.cpp" />
     <ClCompile Include="Composer.cpp" />
     <ClCompile Include="CropResize.cpp" />
@@ -178,6 +179,7 @@
     <ClCompile Include="dshow\VirtualCam.cpp" />
     <ClCompile Include="dshow\VirtualCamRegister.cpp" />
     <ClCompile Include="FFmpegDecoderImpl.cpp" />
+    <ClCompile Include="FFmpegUtils.cpp" />
     <ClCompile Include="FileVideoSource.cpp" />
     <ClCompile Include="ippimpl.cpp" />
     <ClCompile Include="LocalTransport.cpp" />
@@ -197,6 +199,7 @@
     <ClInclude Include="..\include\vnxvideo\vnxvideoimpl.h" />
     <ClInclude Include="..\include\vnxvideo\vnxvideologimpl.h" />
     <ClInclude Include="dshow\VirtualCam.h" />
+    <ClInclude Include="FFmpegUtils.h" />
     <ClInclude Include="GrayAnalyticsBase.h" />
     <ClInclude Include="openh264Common.h" />
     <ClInclude Include="RawSample.h" />

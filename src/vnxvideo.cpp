@@ -1005,3 +1005,46 @@ VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_snapshot(vnxvideo_vmsplugin_t vmspl
     }
 
 }
+
+VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(int channels,
+    EMediaSubtype input, const char* inputDetails,
+    EMediaSubtype output, const char* outputDetails,
+    vnxvideo_transcoder_t* transcoder) {
+    try {
+        transcoder->ptr = VnxVideo::CreateAudioTranscoder(channels, input, inputDetails, output, outputDetails);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_create_audio_transcoder: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC void vnxvideo_transcoder_free(vnxvideo_transcoder_t transcoder) {
+    delete reinterpret_cast<VnxVideo::ITranscoder*>(transcoder.ptr);
+}
+VNXVIDEO_DECLSPEC int vnxvideo_transcoder_subscribe(vnxvideo_transcoder_t transcoder, vnxvideo_on_buffer_t handle_data, void* usrptr) {
+    try {
+        VnxVideo::ITranscoder* p = reinterpret_cast<VnxVideo::ITranscoder*>(transcoder.ptr);
+        if (handle_data != nullptr)
+            p->Subscribe([=](VnxVideo::IBuffer* buf, uint64_t ts) { handle_data(usrptr, vnxvideo_buffer_t{ buf }, ts); });
+        else
+            p->Subscribe([](VnxVideo::IBuffer* buf, uint64_t ts) {});
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_transcoder_subscribe: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC int vnxvideo_transcoder_process(vnxvideo_transcoder_t transcoder, vnxvideo_buffer_t buffer, uint64_t timestamp) {
+    try {
+        VnxVideo::ITranscoder* p = reinterpret_cast<VnxVideo::ITranscoder*>(transcoder.ptr);
+        p->Process(reinterpret_cast<VnxVideo::IBuffer*>(buffer.ptr), timestamp);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_transcoder_process: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+
+}
