@@ -46,17 +46,26 @@ void vnxvideo_init_ffmpeg(ELogLevel level) {
     av_log_set_callback(ffmpeglog);
 }
 
+std::string fferr2str(int errnum) {
+    char res[AV_ERROR_MAX_STRING_SIZE]{ 0 };
+    av_make_error_string(res, AV_ERROR_MAX_STRING_SIZE, errnum);
+    return res;
+}
+
 std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup) {
     const AVCodec* codec = avcodec_find_decoder(codecId);
     if (!codec)
         throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder failed: " + std::to_string(codecId));
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
-    res->flags |= AV_CODEC_FLAG_LOW_DELAY;
-    res->flags2 |= AV_CODEC_FLAG2_FAST;
     setup(*res.get());
+
+    res->flags |= AV_CODEC_FLAG_LOW_DELAY;
+    res->flags2 |= AV_CODEC_FLAG2_CHUNKS;
+    res->flags2 |= AV_CODEC_FLAG2_FAST;
+
     int r = avcodec_open2(res.get(), codec, 0);
     if (r < 0)
-        throw std::runtime_error("createAvDecoderContext: avcodec_open2 failed: "+std::to_string(r));
+        throw std::runtime_error("createAvDecoderContext: avcodec_open2 failed: "+std::to_string(r)+": "+fferr2str(r));
     return res;
 }
 
@@ -65,9 +74,19 @@ std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::f
     if (!codec)
         throw std::runtime_error("createAvEncoderContext: avcodec_find_encoder failed: " + std::to_string(codecId));
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
+
     setup(*res.get());
+
     int r = avcodec_open2(res.get(), codec, 0);
     if (r < 0)
-        throw std::runtime_error("createAvEncoderContext: avcodec_open2 failed: "+ std::to_string(r));
+        throw std::runtime_error("createAvEncoderContext: avcodec_open2 failed: "+ std::to_string(r) + ": " + fferr2str(r));
     return res;
+}
+
+std::shared_ptr<AVFrame> avframeAlloc() {
+    return std::shared_ptr<AVFrame>(av_frame_alloc(), [](AVFrame* f) { av_frame_free(&f); });
+}
+
+std::shared_ptr<AVPacket> avpacketAlloc() {
+    return std::shared_ptr<AVPacket>(av_packet_alloc(), [](AVPacket* p) { av_packet_free(&p); });
 }
