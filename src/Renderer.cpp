@@ -243,6 +243,15 @@ public:
     }
 
 private:
+    void sanitizeTimestamps() {
+        auto now_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        for (auto &s : m_samples) {
+            if (s.first.get() != nullptr && abs(int64_t(now_milliseconds - s.second)) > 5000) { // difference from system clock is more than 5 seconds
+                s.first.reset();
+                s.second = 0;
+            }
+        }
+    }
     void doRun() {
         std::unique_lock<std::mutex> lock(m_mutex);
         auto prev = std::chrono::high_resolution_clock::now();
@@ -252,13 +261,7 @@ private:
                 m_cond.wait(lock);
             if (!m_run)
                 break;
-            auto now_milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-            for (auto &s : m_samples) {
-                if (s.first.get() != nullptr && abs(int64_t(now_milliseconds - s.second)) > 5000) { // difference from system clock is more than 5 seconds
-                    s.first.reset();
-                    s.second = 0;
-                }
-            }
+            //sanitizeTimestamps();
             auto samples = m_samples;
             int width = m_width;
             int height = m_height;
@@ -396,9 +399,16 @@ private:
             int w;
             int h;
             src->GetFormat(csp, w, h);
-            if (csp != EMF_I420) {
+            AVPixelFormat avPixFmt = AV_PIX_FMT_NONE;
+            if (csp != EMF_I420 && csp != EMF_NV12) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::doRender(): unsupported input sample format: " << csp;
                 continue;
+            }
+            else {
+                if (csp == EMF_I420)
+                    avPixFmt = AV_PIX_FMT_YUV420P;
+                else if (csp == EMF_NV12)
+                    avPixFmt = AV_PIX_FMT_NV12;
             }
 
             int src_strides[4];
@@ -456,8 +466,9 @@ private:
 
             std::shared_ptr<SwsContext> sws;
             if (swsContexts[k].get() == nullptr) {
-                sws.reset(sws_getContext(srcRoi.width, srcRoi.height, AV_PIX_FMT_YUV420P,
-                    dstRoi.width, dstRoi.height, AV_PIX_FMT_YUV420P, SWS_BICUBIC, nullptr, nullptr, nullptr), sws_freeContext);
+                sws.reset(sws_getContext(srcRoi.width, srcRoi.height, avPixFmt,
+                    dstRoi.width, dstRoi.height, AV_PIX_FMT_YUV420P, 
+                    SWS_BICUBIC, nullptr, nullptr, nullptr), sws_freeContext);
                 swsContexts[k] = sws;
             }
             else
