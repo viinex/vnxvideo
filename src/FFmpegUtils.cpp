@@ -21,8 +21,10 @@ ELogLevel ffmpeg2loglevel(int level) {
         return VNXLOG_WARNING;
     else if (level <= AV_LOG_INFO)
         return VNXLOG_INFO;
+    //else if (level <= AV_LOG_DEBUG)
+    //    return VNXLOG_DEBUG;
     else
-        return VNXLOG_HIGHEST; // we do not want ffmpeg debug output really
+        return VNXLOG_HIGHEST; 
 }
 int loglevel2ffmpeg(ELogLevel level) {
     switch (level) {
@@ -57,11 +59,12 @@ std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::f
     if (!codec)
         throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder failed: " + std::to_string(codecId));
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
-    setup(*res.get());
 
     res->flags |= AV_CODEC_FLAG_LOW_DELAY;
     res->flags2 |= AV_CODEC_FLAG2_CHUNKS;
     res->flags2 |= AV_CODEC_FLAG2_FAST;
+
+    setup(*res.get());
 
     int r = avcodec_open2(res.get(), codec, 0);
     if (r < 0)
