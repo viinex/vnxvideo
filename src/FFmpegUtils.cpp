@@ -93,3 +93,72 @@ std::shared_ptr<AVFrame> avframeAlloc() {
 std::shared_ptr<AVPacket> avpacketAlloc() {
     return std::shared_ptr<AVPacket>(av_packet_alloc(), [](AVPacket* p) { av_packet_free(&p); });
 }
+
+EColorspace fromAVPixelFormat(AVPixelFormat format) {
+    switch (format) {
+    case AV_PIX_FMT_YUVJ420P: // dont know how it differs from AV_PIX_FMT_YUV420P
+    case AV_PIX_FMT_YUV420P: return EMF_I420; break;
+    case AV_PIX_FMT_YUV422P: return EMF_YV12; break;
+    case AV_PIX_FMT_NV12: return EMF_NV12; break;
+    case AV_PIX_FMT_NV21: return EMF_NV21; break;
+    case AV_PIX_FMT_YUYV422: return EMF_YUY2; break;
+    case AV_PIX_FMT_UYVY422: return EMF_UYVY; break;
+    case AV_PIX_FMT_YUV410P: return EMF_YVU9; break;
+
+    case AV_PIX_FMT_RGB24: return EMF_RGB24; break;
+    case AV_PIX_FMT_RGBA: return EMF_RGB32; break;
+    case AV_PIX_FMT_BGR565BE:
+    case AV_PIX_FMT_BGR565LE:
+    case AV_PIX_FMT_BGR555LE:
+    case AV_PIX_FMT_BGR555BE: return EMF_RGB16; break;
+    default: return EMF_NONE;
+    }
+}
+
+int nplanesByAVPixelFormat(AVPixelFormat format) {
+    switch (format) {
+    case AV_PIX_FMT_YUVJ420P:
+    case AV_PIX_FMT_YUV420P:
+    case AV_PIX_FMT_YUV422P:
+    case AV_PIX_FMT_YUV410P: return 3;
+    case AV_PIX_FMT_NV12:
+    case AV_PIX_FMT_NV21: return 2;
+    case AV_PIX_FMT_YUYV422:
+    case AV_PIX_FMT_UYVY422: return 1;
+    case AV_PIX_FMT_RGB24:
+    case AV_PIX_FMT_RGBA:
+    case AV_PIX_FMT_BGR565BE:
+    case AV_PIX_FMT_BGR565LE:
+    case AV_PIX_FMT_BGR555LE:
+    case AV_PIX_FMT_BGR555BE: return 1;
+    default: return 0;
+    }
+}
+
+CAvcodecRawSample::CAvcodecRawSample() {
+    m_frame.reset(av_frame_alloc(), [](AVFrame* f) { av_frame_free(&f); });
+}
+CAvcodecRawSample::CAvcodecRawSample(const AVFrame* f) {
+    m_frame.reset(av_frame_clone(f), [](AVFrame* f) { av_frame_free(&f); });
+}
+
+VnxVideo::IRawSample* CAvcodecRawSample::Dup() {
+    return new CAvcodecRawSample(m_frame.get());
+}
+void CAvcodecRawSample::GetFormat(EColorspace &csp, int &width, int &height) {
+    csp = fromAVPixelFormat((AVPixelFormat)m_frame->format);
+    width = m_frame->width;
+    height = m_frame->height;
+}
+void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
+    int nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);
+    memcpy(strides, m_frame->linesize, nplanes * sizeof(int));
+    memcpy(planes, m_frame->data, nplanes * sizeof(uint8_t*));
+}
+void CAvcodecRawSample::GetData(uint8_t* &data, int& size) {
+    data = nullptr;
+    size = 0;
+}
+AVFrame* CAvcodecRawSample::GetAVFrame() {
+    return m_frame.get();
+}

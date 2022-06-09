@@ -23,3 +23,21 @@ std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::f
 std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup = [](...) {});
 std::shared_ptr<AVFrame> avframeAlloc();
 std::shared_ptr<AVPacket> avpacketAlloc();
+
+EColorspace fromAVPixelFormat(AVPixelFormat format);
+int nplanesByAVPixelFormat(AVPixelFormat format);
+
+
+class CAvcodecRawSample : public VnxVideo::IRawSample {
+public:
+    CAvcodecRawSample();
+    CAvcodecRawSample(const AVFrame* f);
+
+    VnxVideo::IRawSample* Dup();
+    virtual void GetFormat(EColorspace &csp, int &width, int &height);
+    virtual void GetData(int* strides, uint8_t** planes);
+    virtual void GetData(uint8_t* &data, int& size);
+    AVFrame* GetAVFrame();
+private:
+    std::shared_ptr<AVFrame> m_frame;
+};
