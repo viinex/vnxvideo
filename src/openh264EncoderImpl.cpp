@@ -4,6 +4,13 @@
 #include <cstring>
 
 #include "openh264Common.h"
+#include "RawSample.h"
+#include "FFmpegUtils.h"
+
+extern "C" {
+#include <libswscale/swscale.h>
+}
+
 
 class COpenH264Encoder : public VnxVideo::IVideoEncoder
 {
@@ -14,6 +21,7 @@ private:
     const int m_fps;
     VnxVideo::TOnBufferCallback m_onBuffer;
 
+    std::shared_ptr<SwsContext> m_swsc;
     std::shared_ptr<ISVCEncoder> m_encoder;
 
     EColorspace m_csp;
@@ -35,7 +43,16 @@ public:
         m_width = width;
         m_height = height;
         init();
-        EVideoFormatType videoFormat(csp2vf(m_csp));
+
+        if (csp != EMF_I420) {
+            m_swsc.reset(sws_getContext(width, height, toAVPixelFormat(csp),
+                width, height, AV_PIX_FMT_YUV420P, SWS_BILINEAR,
+                nullptr, nullptr, nullptr), sws_freeContext);
+        }
+        else
+            m_swsc.reset();
+
+        EVideoFormatType videoFormat = videoFormatI420;
         m_encoder->SetOption(ENCODER_OPTION_DATAFORMAT, &videoFormat);
     }
     void OutputNAL(uint8_t *data, int size, uint64_t ts) {
@@ -45,15 +62,36 @@ public:
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
         if (!m_encoder.get())
             return;
-        uint8_t* planes[4];
-        int strides[4];
-        sample->GetData(strides, planes);
+        uint8_t* planes_src[4];
+        int strides_src[4];
+        sample->GetData(strides_src, planes_src);
+
+        VnxVideo::PRawSample sampleI420; 
+        uint8_t* planes_dst[4];
+        int strides_dst[4];
+
+        uint8_t** planes = planes_src;
+        int* strides = strides_src;
+        
+        if (m_swsc.get()) {
+            sampleI420.reset(new CRawSample(m_width, m_height));
+            sampleI420->GetData(strides_dst, planes_dst);
+            int res = sws_scale(m_swsc.get(), planes, strides, 0, m_height, planes_dst, strides_dst);
+            if (res != m_height) {
+                VNXVIDEO_LOG(VNXLOG_WARNING, "renderer") << "COpenH264::Encoder: sws_scale failed";
+                return;
+            }
+            else {
+                planes = planes_dst;
+                strides = strides_dst;
+            }
+        }
 
         SSourcePicture pic;
         memset(&pic, 0, sizeof(SSourcePicture));
         pic.iPicWidth = m_width;
         pic.iPicHeight = m_height;
-        pic.iColorFormat = csp2vf(m_csp);
+        pic.iColorFormat = videoFormatI420;
         pic.uiTimeStamp = timestamp;
         memcpy(pic.iStride, strides, 4 * sizeof(int));
         memcpy(pic.pData, planes, 4 * sizeof(uint8_t*));

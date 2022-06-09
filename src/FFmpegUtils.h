@@ -25,6 +25,7 @@ std::shared_ptr<AVFrame> avframeAlloc();
 std::shared_ptr<AVPacket> avpacketAlloc();
 
 EColorspace fromAVPixelFormat(AVPixelFormat format);
+AVPixelFormat toAVPixelFormat(EColorspace csp);
 int nplanesByAVPixelFormat(AVPixelFormat format);
 
 

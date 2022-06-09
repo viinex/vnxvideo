@@ -115,6 +115,22 @@ EColorspace fromAVPixelFormat(AVPixelFormat format) {
     }
 }
 
+AVPixelFormat toAVPixelFormat(EColorspace csp) {
+    switch (csp) {
+    case EMF_I420: return AV_PIX_FMT_YUV420P;
+    case EMF_YV12: return AV_PIX_FMT_YUV422P;
+    case EMF_NV12: return AV_PIX_FMT_NV12;
+    case EMF_NV21: return AV_PIX_FMT_NV21;
+    case EMF_YUY2: return AV_PIX_FMT_YUYV422;
+    case EMF_UYVY: return AV_PIX_FMT_UYVY422;
+    case EMF_YVU9: return AV_PIX_FMT_YUV410P;
+    case EMF_RGB24: return AV_PIX_FMT_RGB24;
+    case EMF_RGB32: return AV_PIX_FMT_RGBA;
+    case EMF_RGB16: return AV_PIX_FMT_BGR565LE;
+    default: return AV_PIX_FMT_NONE;
+    }
+}
+
 int nplanesByAVPixelFormat(AVPixelFormat format) {
     switch (format) {
     case AV_PIX_FMT_YUVJ420P:
