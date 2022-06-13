@@ -17,7 +17,7 @@ class CFFmpegEncoderImpl : public VnxVideo::IVideoEncoder
 {
 private:
     const std::string m_profile;
-    const std::string m_preset;
+    std::string m_preset;
     const std::string m_quality;
     const int m_fps;
     VnxVideo::TOnBufferCallback m_onBuffer;
@@ -35,6 +35,9 @@ public:
         , m_fps(fps)
         , m_quality(quality)
     {
+        if (m_preset == "ultrafast" || m_preset == "superfast") {
+            m_preset = "veryfast";
+        }
     }
     virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
         m_onBuffer = onBuffer;
@@ -100,6 +103,7 @@ public:
         frm->width = m_width;
         frm->height = m_height;
         frm->pts = timestamp;
+        frm->time_base = { 1,1000 };
 
         if (m_cc->hw_frames_ctx != nullptr) {
             std::shared_ptr<AVFrame> dst(avframeAlloc());
@@ -116,7 +120,8 @@ public:
                     << res << ": " << fferr2str(res);
                 return;
             }
-            dst->pts = frm->pts;
+            dst->pts = timestamp;
+            dst->time_base = { 1,1000 };
             frm = dst;
         }
 
@@ -170,7 +175,28 @@ private:
 #ifdef __linux__
             hwDevType = AV_HWDEVICE_TYPE_DRM;
 #endif
-            int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
+            int res = av_opt_set(&cc, "profile", m_profile.c_str(), AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set profile: "
+                    << res << ": " << fferr2str(res);
+            }
+            res = av_opt_set(&cc, "preset", m_preset.c_str(), AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
+                    << res << ": " << fferr2str(res);
+            }
+            res = av_opt_set_int(&cc, "idr_interval", 50, AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
+                    << res << ": " << fferr2str(res);
+            }
+            res = av_opt_set_int(&cc, "low_delay_brc", 1, AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
+                    << res << ": " << fferr2str(res);
+            }
+
+            res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
             }
@@ -191,7 +217,7 @@ private:
         frames_ctx->sw_format = AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P; //
         frames_ctx->width = width;
         frames_ctx->height = height;
-        frames_ctx->initial_pool_size = 4;
+        frames_ctx->initial_pool_size = 16;
         int res = av_hwframe_ctx_init(hw_frames_ref);
         if (res != 0) {
             VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwframe_ctx_init failed: " << res << ": " << fferr2str(res);

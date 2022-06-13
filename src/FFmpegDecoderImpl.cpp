@@ -109,6 +109,7 @@ private:
                     << res << ": " << fferr2str(res);
                 continue;
             }
+            dst->pts = hwfrm->pts;
             callOnFormat(dst);
             m_onFrame(&result, dst->pts); // pkt_pts said to be deprecated but it's the only valid value
         }

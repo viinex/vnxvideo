@@ -261,7 +261,7 @@ private:
                 m_cond.wait(lock);
             if (!m_run)
                 break;
-            //sanitizeTimestamps();
+            sanitizeTimestamps();
             auto samples = m_samples;
             int width = m_width;
             int height = m_height;
