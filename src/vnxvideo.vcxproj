@@ -179,6 +179,7 @@
     <ClCompile Include="dshow\VirtualCam.cpp" />
     <ClCompile Include="dshow\VirtualCamRegister.cpp" />
     <ClCompile Include="FFmpegDecoderImpl.cpp" />
+    <ClCompile Include="FFmpegEncoderImpl.cpp" />
     <ClCompile Include="FFmpegUtils.cpp" />
     <ClCompile Include="FileVideoSource.cpp" />
     <ClCompile Include="ippimpl.cpp" />

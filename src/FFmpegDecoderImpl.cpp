@@ -20,6 +20,9 @@ public:
     {
         m_cc=createAvDecoderContext(codecID,
             [=](AVCodecContext& cc) {
+            cc.pkt_timebase = { 1,1000 };
+            cc.time_base = { 1,1000 };
+
             AVBufferRef* hw;
             AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
 #ifdef _WIN32

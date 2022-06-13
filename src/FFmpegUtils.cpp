@@ -58,6 +58,17 @@ std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::f
     const AVCodec* codec = avcodec_find_decoder(codecId);
     if (!codec)
         throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder failed: " + std::to_string(codecId));
+    return createAvDecoderContext(codec, setup);
+}
+
+std::shared_ptr<AVCodecContext> createAvDecoderContext(const char* name, std::function<void(AVCodecContext&)> setup) {
+    const AVCodec* codec = avcodec_find_decoder_by_name(name);
+    if (!codec)
+        throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder_by_name failed: " + std::string(name));
+    return createAvDecoderContext(codec, setup);
+}
+
+std::shared_ptr<AVCodecContext> createAvDecoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup){
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
 
     res->flags |= AV_CODEC_FLAG_LOW_DELAY;
@@ -76,6 +87,17 @@ std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::f
     const AVCodec* codec = avcodec_find_encoder(codecId);
     if (!codec)
         throw std::runtime_error("createAvEncoderContext: avcodec_find_encoder failed: " + std::to_string(codecId));
+    return createAvEncoderContext(codec, setup);
+}
+
+std::shared_ptr<AVCodecContext> createAvEncoderContext(const char* name, std::function<void(AVCodecContext&)> setup) {
+    const AVCodec* codec = avcodec_find_encoder_by_name(name);
+    if (!codec)
+        throw std::runtime_error("createAvEncoderContext: avcodec_find_encoder_by_name failed: " + std::string(name));
+    return createAvEncoderContext(codec, setup);
+}
+
+std::shared_ptr<AVCodecContext> createAvEncoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup) {
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
 
     setup(*res.get());

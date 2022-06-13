@@ -19,8 +19,12 @@ std::string fferr2str(int errnum);
 
 void vnxvideo_init_ffmpeg(ELogLevel level);
 
+std::shared_ptr<AVCodecContext> createAvDecoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup = [](...) {});
+std::shared_ptr<AVCodecContext> createAvDecoderContext(const char* name, std::function<void(AVCodecContext&)> setup = [](...) {});
 std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup = [](...) {});
-std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup = [](...) {});
+std::shared_ptr<AVCodecContext> createAvEncoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup);
+std::shared_ptr<AVCodecContext> createAvEncoderContext(const char* name, std::function<void(AVCodecContext&)> setup);
+std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup);
 std::shared_ptr<AVFrame> avframeAlloc();
 std::shared_ptr<AVPacket> avpacketAlloc();
 

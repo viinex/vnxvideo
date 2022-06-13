@@ -327,7 +327,7 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_
         std::string quality(jget<std::string>(j, "quality", "normal"));
         if (j["type"] != "cpu")
             throw std::runtime_error("unsupported encoder type");
-        VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+        VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str()));
         encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
         return vnxvideo_err_ok;
     }
