@@ -1,4 +1,6 @@
 #include <functional>
+#include <set>
+#include <mutex>
 #include "FFmpegUtils.h"
 
 AVCodecID codecIdFromSubtype(EMediaSubtype subtype) {
@@ -179,9 +181,11 @@ CAvcodecRawSample::CAvcodecRawSample() {
 CAvcodecRawSample::CAvcodecRawSample(const AVFrame* f) {
     m_frame.reset(av_frame_clone(f), [](AVFrame* f) { av_frame_free(&f); });
 }
+CAvcodecRawSample::CAvcodecRawSample(std::shared_ptr<AVFrame> f): m_frame(f) {
+}
 
 VnxVideo::IRawSample* CAvcodecRawSample::Dup() {
-    return new CAvcodecRawSample(m_frame.get());
+    return new CAvcodecRawSample(m_frame);
 }
 void CAvcodecRawSample::GetFormat(EColorspace &csp, int &width, int &height) {
     csp = fromAVPixelFormat((AVPixelFormat)m_frame->format);
@@ -199,4 +203,70 @@ void CAvcodecRawSample::GetData(uint8_t* &data, int& size) {
 }
 AVFrame* CAvcodecRawSample::GetAVFrame() {
     return m_frame.get();
+}
+
+std::map<VnxVideo::ECodecImpl, std::string> g_codecImplementations;
+std::mutex g_codecImplementationsMutex;
+
+void enumHwDevices() {
+    g_codecImplementations.clear();
+    for (AVHWDeviceType t = av_hwdevice_iterate_types(AV_HWDEVICE_TYPE_NONE);
+        t != AV_HWDEVICE_TYPE_NONE;
+        t = av_hwdevice_iterate_types(t)) {
+        AVBufferRef *hw = nullptr;
+        int res = av_hwdevice_ctx_create(&hw, t, nullptr, nullptr, 0);
+        if (res < 0)
+            continue;
+        else
+            av_buffer_unref(&hw);
+        VnxVideo::ECodecImpl eci;
+        if (t == AV_HWDEVICE_TYPE_QSV)
+            eci=VnxVideo::ECodecImpl::ECI_QSV;
+        else if (t == AV_HWDEVICE_TYPE_CUDA)
+            eci=VnxVideo::ECodecImpl::ECI_CUDA;
+        else if (t == AV_HWDEVICE_TYPE_D3D11VA)
+            eci=VnxVideo::ECodecImpl::ECI_D3D11VA;
+        else if (t == AV_HWDEVICE_TYPE_VAAPI)
+            eci=VnxVideo::ECodecImpl::ECI_VAAPI;
+        else 
+            continue;
+        g_codecImplementations[eci] = av_hwdevice_get_type_name(t);
+    }
+    std::stringstream ss;
+    ss << "Supported video encoder/decoder devices: cpu";
+    for (auto i : g_codecImplementations)
+        ss << ", " << i.second;
+    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << ss.str();
+}
+
+bool isCodecImplSupported(VnxVideo::ECodecImpl eci) {
+    std::unique_lock<std::mutex> lock(g_codecImplementationsMutex);
+    static bool g_codecImplementationsInitialized = false;
+    if (!g_codecImplementationsInitialized) {
+        enumHwDevices();
+        g_codecImplementationsInitialized = true;
+    }
+    return g_codecImplementations.find(eci) != g_codecImplementations.end();
+}
+
+void checkFramesContext(AVCodecContext& cc, int width, int height, AVPixelFormat hwpixfmt) {
+    if (cc.hw_device_ctx == nullptr)
+        return;
+    if (cc.hw_frames_ctx != nullptr)
+        return;
+    AVBufferRef *hw_frames_ref = av_hwframe_ctx_alloc(cc.hw_device_ctx);
+    AVHWFramesContext* frames_ctx = (AVHWFramesContext*)hw_frames_ref->data;
+    frames_ctx->format = hwpixfmt;
+    frames_ctx->sw_format = AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P; //
+    frames_ctx->width = width;
+    frames_ctx->height = height;
+    frames_ctx->initial_pool_size = 16;
+    int res = av_hwframe_ctx_init(hw_frames_ref);
+    if (res != 0) {
+        VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "checkFramesContext: av_hwframe_ctx_init failed: " << res << ": " << fferr2str(res);
+        av_buffer_unref(&hw_frames_ref);
+    }
+    else {
+        cc.hw_frames_ctx = hw_frames_ref; // ownership transferred
+    }
 }

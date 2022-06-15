@@ -76,6 +76,14 @@ namespace VnxVideo
     };
     typedef std::shared_ptr<IVideoDecoder> PVideoDecoder;
 
+    enum ECodecImpl { 
+        ECI_CPU = 0, 
+        ECI_QSV = 1, 
+        ECI_CUDA = 2, 
+        ECI_VAAPI = 4,
+        ECI_D3D11VA = 8,
+    };
+
     VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_FFmpegH264();
     VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_FFmpegHEVC();
     VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_OpenH264();
@@ -97,7 +105,7 @@ namespace VnxVideo
 
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci = ECI_CPU);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc);
 
     class ITranscoder {

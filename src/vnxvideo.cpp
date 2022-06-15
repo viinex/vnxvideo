@@ -325,11 +325,17 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_
         std::string preset(jget<std::string>(j,"preset"));
         int fps(jget<int>(j,"framerate", 25));
         std::string quality(jget<std::string>(j, "quality", "normal"));
-        if (j["type"] != "cpu")
+        if (j["type"] == "cpu") {
+            VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+            encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
+            return vnxvideo_err_ok;
+        }
+        else if (j["type"] == "qsv") {
+            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_QSV);
+            return vnxvideo_err_ok;
+        }
+        else
             throw std::runtime_error("unsupported encoder type");
-        VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str()));
-        encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
-        return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_encoder_create: " << e.what();

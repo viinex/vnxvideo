@@ -37,6 +37,7 @@ class CAvcodecRawSample : public VnxVideo::IRawSample {
 public:
     CAvcodecRawSample();
     CAvcodecRawSample(const AVFrame* f);
+    CAvcodecRawSample(std::shared_ptr<AVFrame> f);
 
     VnxVideo::IRawSample* Dup();
     virtual void GetFormat(EColorspace &csp, int &width, int &height);
@@ -46,3 +47,7 @@ public:
 private:
     std::shared_ptr<AVFrame> m_frame;
 };
+
+bool isCodecImplSupported(VnxVideo::ECodecImpl eci);
+
+void checkFramesContext(AVCodecContext& cc, int width, int height, AVPixelFormat hwpixfmt);

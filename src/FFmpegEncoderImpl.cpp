@@ -17,9 +17,12 @@ class CFFmpegEncoderImpl : public VnxVideo::IVideoEncoder
 {
 private:
     const std::string m_profile;
-    std::string m_preset;
+    const std::string m_preset;
     const std::string m_quality;
+    const int m_qp;
     const int m_fps;
+    const VnxVideo::ECodecImpl m_codecImpl;
+
     VnxVideo::TOnBufferCallback m_onBuffer;
 
     std::shared_ptr<SwsContext> m_swsc;
@@ -29,14 +32,19 @@ private:
     int m_width;
     int m_height;
 public:
-    CFFmpegEncoderImpl(const char* profile, const char* preset, int fps, const char* quality)
+    CFFmpegEncoderImpl(const char* profile, const char* preset, int fps, const char* quality, VnxVideo::ECodecImpl eci)
         : m_profile(profile)
         , m_preset(preset)
         , m_fps(fps)
         , m_quality(quality)
+        , m_codecImpl(eci)
+        , m_qp(qualityEnumToQp(quality))
     {
-        if (m_preset == "ultrafast" || m_preset == "superfast") {
-            m_preset = "veryfast";
+        if (m_preset == "ultrafast" || m_preset == "superfast") { // QSV does not support these
+            const_cast<std::string&>(m_preset) = "veryfast";
+        }
+        if (m_profile == "baseline" && m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
+            const_cast<std::string&>(m_profile) = "constrained_baseline";
         }
     }
     virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
@@ -49,7 +57,7 @@ public:
 
         m_cc.reset();
 
-        if (csp != EMF_NV12) {
+        if (m_codecImpl != VnxVideo::ECodecImpl::ECI_CPU && csp != EMF_NV12) {
             m_swsc.reset(sws_getContext(width, height, toAVPixelFormat(csp),
                 width, height, AV_PIX_FMT_NV12, SWS_BILINEAR,
                 nullptr, nullptr, nullptr), sws_freeContext);
@@ -99,7 +107,7 @@ public:
         std::shared_ptr<AVFrame> frm(avframeAlloc());
         memcpy(frm->data, planes, 4 * sizeof(uint8_t*));
         memcpy(frm->linesize, strides, 4 * sizeof(int));
-        frm->format = AV_PIX_FMT_NV12;
+        frm->format = (m_codecImpl == VnxVideo::ECodecImpl::ECI_CPU) ? AV_PIX_FMT_YUV420P : AV_PIX_FMT_NV12;
         frm->width = m_width;
         frm->height = m_height;
         frm->pts = timestamp;
@@ -153,28 +161,36 @@ private:
     void checkCreateCc() {
         if (m_cc.get())
             return;
-        m_cc = createAvEncoderContext("h264_qsv",
+        const char* encoderName = "h264";
+        AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
+        AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
+
+        if (m_codecImpl == VnxVideo::ECodecImpl::ECI_QSV) {
+            encoderName = "h264_qsv";
+            hwDevType = AV_HWDEVICE_TYPE_QSV;
+            hwPixFmt = AV_PIX_FMT_QSV;
+        }
+        else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
+            encoderName = "h264_vaapi";
+            hwDevType = AV_HWDEVICE_TYPE_VAAPI;
+            hwPixFmt = AV_PIX_FMT_VAAPI;
+        }
+
+        m_cc = createAvEncoderContext(encoderName,
             [=](AVCodecContext& cc) {
             cc.time_base = { 1, 1000 };
-            cc.pix_fmt = AV_PIX_FMT_QSV;// AV_PIX_FMT_D3D11; // AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P;
+            cc.pix_fmt = hwPixFmt; // AV_PIX_FMT_D3D11; // AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P;
             cc.width = m_width;
             cc.height = m_height;
             cc.framerate = { 25, 1 };
             cc.flags |= AV_CODEC_FLAG_LOW_DELAY;
             cc.flags2 |= AV_CODEC_FLAG2_FAST;
-            cc.profile = FF_PROFILE_H264_CONSTRAINED_BASELINE;
             cc.gop_size = 50;
             cc.max_b_frames = 0;
             cc.has_b_frames = 0;
 
-            AVBufferRef* hw;
-            AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
-#ifdef _WIN32
-            hwDevType = AV_HWDEVICE_TYPE_QSV;
-#endif
-#ifdef __linux__
-            hwDevType = AV_HWDEVICE_TYPE_DRM;
-#endif
+            AVBufferRef* hw = nullptr;
+
             int res = av_opt_set(&cc, "profile", m_profile.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set profile: "
@@ -182,15 +198,15 @@ private:
             }
             res = av_opt_set(&cc, "preset", m_preset.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set preset: "
+                    << res << ": " << fferr2str(res);
+            }
+            res = av_opt_set_int(&cc, "qp", m_qp, AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set qp: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set_int(&cc, "idr_interval", 50, AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
-                    << res << ": " << fferr2str(res);
-            }
-            res = av_opt_set_int(&cc, "low_delay_brc", 1, AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
                     << res << ": " << fferr2str(res);
@@ -202,85 +218,41 @@ private:
             }
             else {
                 cc.hw_device_ctx = hw;
-                checkFramesContext(cc, m_width, m_height);
+                checkFramesContext(cc, m_width, m_height, hwPixFmt);
             }
         });
     }
-    static void checkFramesContext(AVCodecContext& cc, int width, int height) {
-        if (cc.hw_device_ctx == nullptr)
-            return;
-        if (cc.hw_frames_ctx != nullptr)
-            return;
-        AVBufferRef *hw_frames_ref = av_hwframe_ctx_alloc(cc.hw_device_ctx);
-        AVHWFramesContext* frames_ctx = (AVHWFramesContext*)hw_frames_ref->data;
-        frames_ctx->format = AV_PIX_FMT_QSV;
-        frames_ctx->sw_format = AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P; //
-        frames_ctx->width = width;
-        frames_ctx->height = height;
-        frames_ctx->initial_pool_size = 16;
-        int res = av_hwframe_ctx_init(hw_frames_ref);
-        if (res != 0) {
-            VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwframe_ctx_init failed: " << res << ": " << fferr2str(res);
-            av_buffer_unref(&hw_frames_ref);
-            //av_buffer_unref(&m_cc.hw_device_ctx);
-        }
-        else {
-            cc.hw_frames_ctx = hw_frames_ref; // ownership transferred
-        }
-
-    }
-/*
-    static void qualityEnumToQpAndComplexity(const std::string& f, const std::string& q, const std::string& p,
-        EProfileIdc& profile, int& qp, ECOMPLEXITY_MODE& complexity)
+    static int qualityEnumToQp(const std::string& q)
     {
-        if (f == "baseline")
-            profile = PRO_BASELINE;
-        else if (f == "main")
-            profile = PRO_MAIN;
-        else if (f == "high")
-            profile = PRO_HIGH;
-        else
-            throw std::runtime_error("`profile' enum literal value not recognized");
-
-        if (p == "ultrafast" || p == "superfast" || p == "veryfast")
-            complexity = LOW_COMPLEXITY;
-        else if (p == "faster" || p == "fast" || p == "medium")
-            complexity = MEDIUM_COMPLEXITY;
-        else if (p == "slow" || p == "slower" || p == "veryslow")
-            complexity = HIGH_COMPLEXITY;
-        else
-            throw std::runtime_error("`preset' enum literal value not recognized");
-
         if (q == "best_quality") {
-            qp = 18;
+            return 18;
         }
         else if (q == "fine_quality") {
-            qp = 21;
+            return 21;
         }
         else if (q == "good_quality") {
-            qp = 24;
+            return 24;
         }
         else if (q == "normal") {
-            qp = 27;
+            return 27;
         }
         else if (q == "small_size") {
-            qp = 32;
+            return 32;
         }
         else if (q == "tiny_size") {
-            qp = 38;
+            return 38;
         }
         else if (q == "best_size") {
-            qp = 45;
+            return 45;
         }
         else {
             throw std::runtime_error("`quality' enum literal value not recognized");
         }
     }
-*/
 };
 
 namespace VnxVideo {
-    IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality) {
-        return new CFFmpegEncoderImpl(profile, preset, fps, quality);
+    IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci) {
+        return new CFFmpegEncoderImpl(profile, preset, fps, quality, eci);
     }
 }
