@@ -11,8 +11,6 @@ extern "C" {
 
 #include "FFmpegUtils.h"
 
-class XHWDeviceNotSupported : public std::exception {};
-
 class CVideoDecoder : public VnxVideo::IVideoDecoder {
 public:
     CVideoDecoder(AVCodecID codecID, VnxVideo::ECodecImpl eci)
@@ -50,8 +48,8 @@ public:
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
                 int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
                 if (res != 0) {
-                    VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
-                    throw XHWDeviceNotSupported();
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "ffmpeg") << "av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
+                    throw VnxVideo::XHWDeviceNotSupported();
                 }
                 else {
                     cc.hw_device_ctx = hw;
@@ -162,16 +160,19 @@ private:
 };
 
 namespace VnxVideo {
-    ECodecImpl ecis[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
+    // Defines the priority for hardware decoders. Must end with ECI_CPU
+    ECodecImpl decoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
+
     VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
         try {
-            for (const VnxVideo::ECodecImpl* eci = ecis; *eci != ECodecImpl::ECI_CPU; ++eci) {
+            for (const VnxVideo::ECodecImpl* eci = decoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
                 if (isCodecImplSupported(*eci))
                     return new CVideoDecoder(cid, *eci);
             }
             return new CVideoDecoder(cid, ECodecImpl::ECI_CPU);
         }
         catch (const XHWDeviceNotSupported&) {
+            VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "Failed to create a HW accelerated decoder; CPU decoder will be used";
             return new CVideoDecoder(cid, ECodecImpl::ECI_CPU);
         }
     }

@@ -105,7 +105,10 @@ namespace VnxVideo
 
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci = ECI_CPU);
+    // create encoder of specific hw accelerator implementation
+    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci);
+    // automatically choose supported hw accelerator implementation
+    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality);
     VNXVIDEO_DECLSPEC IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc);
 
     class ITranscoder {
@@ -228,4 +231,6 @@ namespace VnxVideo
             uint64_t begin = 0, uint64_t end = -1) = 0;
         virtual IBuffer* GetSnapshot(const CVmsChannelSelector& selector, uint64_t timestamp) = 0;
     };
+
+    class XHWDeviceNotSupported : public std::exception {};
 }

@@ -175,6 +175,11 @@ private:
             hwDevType = AV_HWDEVICE_TYPE_VAAPI;
             hwPixFmt = AV_PIX_FMT_VAAPI;
         }
+        else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_CUDA) {
+            encoderName = "h264_nvenc";
+            hwDevType = AV_HWDEVICE_TYPE_CUDA;
+            hwPixFmt = AV_PIX_FMT_CUDA;
+        }
 
         m_cc = createAvEncoderContext(encoderName,
             [=](AVCodecContext& cc) {
@@ -252,7 +257,17 @@ private:
 };
 
 namespace VnxVideo {
+    ECodecImpl encoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_QSV, ECodecImpl::ECI_CPU };
+
     IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci) {
         return new CFFmpegEncoderImpl(profile, preset, fps, quality, eci);
+    }
+
+    IVideoEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality) {
+        for (const VnxVideo::ECodecImpl* eci = encoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
+            if (isCodecImplSupported(*eci))
+                return new CFFmpegEncoderImpl(profile, preset, fps, quality, *eci);
+        }
+        return nullptr;
     }
 }
