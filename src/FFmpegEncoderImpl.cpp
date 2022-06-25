@@ -111,7 +111,6 @@ public:
         frm->width = m_width;
         frm->height = m_height;
         frm->pts = timestamp;
-        frm->time_base = { 1,1000 };
 
         if (m_cc->hw_frames_ctx != nullptr) {
             std::shared_ptr<AVFrame> dst(avframeAlloc());
@@ -129,7 +128,6 @@ public:
                 return;
             }
             dst->pts = timestamp;
-            dst->time_base = { 1,1000 };
             frm = dst;
         }
 
@@ -150,7 +148,8 @@ public:
                 return;
             }
             else {
-                m_onBuffer(&CNoOwnershipNalBuffer(pkt->data, pkt->size), pkt->pts);
+                CNoOwnershipNalBuffer buffer(pkt->data, pkt->size);
+                m_onBuffer(&buffer, pkt->pts);
             }
         }
     }

@@ -149,7 +149,8 @@ public:
     }
     void sendFrame(const AVFrame& frm) {
         if (m_output == EMST_WAV) {
-            m_onBuffer(&CNoOwnershipNalBuffer(frm.data[0], frm.linesize[0]), frm.pts);
+            CNoOwnershipNalBuffer buf(frm.data[0], frm.linesize[0]);
+            m_onBuffer(&buf, frm.pts);
         }
         else {
             checkEncoderContext();
@@ -169,7 +170,8 @@ public:
                     return;
                 }
                 else {
-                    m_onBuffer(&CNoOwnershipNalBuffer(m_pkt->data, m_pkt->size), m_pkt->pts);
+                    CNoOwnershipNalBuffer buf(m_pkt->data, m_pkt->size);
+                    m_onBuffer(&buf, m_pkt->pts);
                 }
             }
 
