@@ -261,6 +261,11 @@ public:
             ippiCopy_8u_C1R(src[2], src_strides[2], dst[1], dst_strides[1], roi2);
             ippiCopy_8u_C1R(src[1], src_strides[1], dst[2], dst_strides[2], roi2);
         }
+        else if (src_emf == EMF_NV12)
+        {
+            vnxippiResize_8u_P2P3R(src, { width, height }, src_strides, { 0,0,width,height }, dst, dst_strides,
+                { 0,0,width,height }, 1, 1, IPPI_INTER_NN);
+        }
         else if (src_emf == EMF_I444)
         {
             VnxIppiSize roi2 = { width / 2, height / 2 };
