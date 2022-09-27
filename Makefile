@@ -22,7 +22,7 @@ endif
 
 CXXFLAGS += -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
 
-LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib/intel64
+LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib/intel64 -L$(IPP_HOME)/lib/intel64_lin
 
 LDLIBS = -l:libopenh264.a -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread -lz -ldl -lrt -lswresample -l:libboost_system.a
 
