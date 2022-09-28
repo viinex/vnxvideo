@@ -28,7 +28,12 @@ public:
             AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
             AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
 
-            if (m_codecImpl == VnxVideo::ECodecImpl::ECI_D3D11VA) {
+            const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
+            if (hwDecoderEnv != 0 && strncmp(hwDecoderEnv, "0", 1) == 0 ) {
+                hwDevType = AV_HWDEVICE_TYPE_NONE;
+                hwPixFmt = AV_PIX_FMT_NONE;
+            }
+            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_D3D11VA) {
                 hwDevType = AV_HWDEVICE_TYPE_D3D11VA;
                 hwPixFmt = AV_PIX_FMT_D3D11;
             }

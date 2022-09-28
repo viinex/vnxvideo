@@ -263,6 +263,10 @@ namespace VnxVideo {
     }
 
     IVideoEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality) {
+        const char* const hwEncoderEnv = getenv("VNX_HW_ENCODER");
+        if (hwEncoderEnv != 0 && strncmp(hwEncoderEnv, "0", 1) == 0 ) {
+            return nullptr;
+        }
         for (const VnxVideo::ECodecImpl* eci = encoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
             if (isCodecImplSupported(*eci))
                 return new CFFmpegEncoderImpl(profile, preset, fps, quality, *eci);
