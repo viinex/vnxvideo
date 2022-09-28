@@ -104,7 +104,7 @@ private:
                 return;
             }
             if (res != 0) {
-                VNXVIDEO_LOG(VNXLOG_ERROR, "ffmpeg") << "avcodec_receive_frame failed: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_receive_frame failed: "
                     << res << ": " << fferr2str(res);
                 return;
             }
@@ -120,7 +120,7 @@ private:
                 return; // or sleep and continue?
             }
             if (res != 0) {
-                VNXVIDEO_LOG(VNXLOG_ERROR, "ffmpeg") << "avcodec_receive_frame failed: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_receive_frame failed: "
                     << res << ": " << fferr2str(res);
                 return;
             }
