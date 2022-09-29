@@ -256,11 +256,6 @@ int vnxvideo_raw_sample_get_format(vnxvideo_raw_sample_t sample, EColorspace *cs
     return vnxvideo_err_ok;
 }
 
-vnxvideo_buffer_t vnxvideo_raw_sample_to_buffer(vnxvideo_raw_sample_t r) {
-    return vnxvideo_buffer_t {
-        static_cast<VnxVideo::IBuffer*>(reinterpret_cast<VnxVideo::IRawSample*>(r.ptr)) 
-    };
-}
 int vnxvideo_buffer_dup(vnxvideo_buffer_t src, vnxvideo_buffer_t* dst) {
     auto s = reinterpret_cast<VnxVideo::IBuffer*>(src.ptr);
     dst->ptr = s->Dup();

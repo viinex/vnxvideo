@@ -117,7 +117,7 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_buffer_wrap(const uint8_t *data, int size, vnxvideo_buffer_t*);
     // copy memory and wrap it into vnxvideo buffer in a single call
     VNXVIDEO_DECLSPEC int vnxvideo_buffer_copy_wrap(const uint8_t *data, int size, vnxvideo_buffer_t*);
-    //VNXVIDEO_DECLSPEC vnxvideo_buffer_t vnxvideo_raw_sample_to_buffer(vnxvideo_raw_sample_t); // cast, not duplication
+
     VNXVIDEO_DECLSPEC int vnxvideo_raw_sample_dup(vnxvideo_raw_sample_t, vnxvideo_raw_sample_t*); // shallow copy (share same data w/original)
     VNXVIDEO_DECLSPEC int vnxvideo_raw_sample_copy(vnxvideo_raw_sample_t, vnxvideo_raw_sample_t*); // deep copy
     VNXVIDEO_DECLSPEC void vnxvideo_raw_sample_free(vnxvideo_raw_sample_t);

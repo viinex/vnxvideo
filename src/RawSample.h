@@ -384,9 +384,6 @@ public:
         width = m_width;
         height = m_height;
     }
-    void GetData(uint8_t* &data, int& size) {
-        static_cast<VnxVideo::IBuffer*>(m_sample.get())->GetData(data, size);
-    }
     void GetData(int* strides, uint8_t** planes) {
         m_sample->GetData(strides, planes);
         planes[0] += m_top*strides[0] + m_left;

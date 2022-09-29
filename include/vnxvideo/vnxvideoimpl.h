@@ -19,8 +19,9 @@ namespace VnxVideo
         virtual IBuffer* Dup() = 0; // make a shallow copy, ie share the same underlying raw buffer
     };
 
-    class IRawSample: public IBuffer {
+    class IRawSample {
     public:
+        virtual ~IRawSample() {}
         virtual void GetFormat(EColorspace &csp, int &width, int &height) = 0;
         virtual void GetData(int* strides, uint8_t** planes) = 0;
         virtual IRawSample* Dup() = 0; // make a shallow copy, ie share the same underlying raw buffer
