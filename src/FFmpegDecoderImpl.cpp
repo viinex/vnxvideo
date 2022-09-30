@@ -11,7 +11,7 @@ extern "C" {
 
 #include "FFmpegUtils.h"
 
-class CVideoDecoder : public VnxVideo::IVideoDecoder {
+class CVideoDecoder : public VnxVideo::IMediaDecoder {
 public:
     CVideoDecoder(AVCodecID codecID, VnxVideo::ECodecImpl eci)
         : m_csp(EMF_NONE)
@@ -168,7 +168,7 @@ namespace VnxVideo {
     // Defines the priority for hardware decoders. Must end with ECI_CPU
     ECodecImpl decoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
 
-    VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
         try {
             for (const VnxVideo::ECodecImpl* eci = decoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
                 if (isCodecImplSupported(*eci))
@@ -181,10 +181,10 @@ namespace VnxVideo {
             return new CVideoDecoder(cid, ECodecImpl::ECI_CPU);
         }
     }
-    VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpegH264() {
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegH264() {
         return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_H264);
     }
-    VnxVideo::IVideoDecoder* CreateVideoDecoder_FFmpegHEVC() {
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegHEVC() {
         return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_HEVC);
     }
 }

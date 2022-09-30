@@ -322,7 +322,7 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_
         std::string quality(jget<std::string>(j, "quality", "normal"));
         std::string type(jget<std::string>(j, "type", "auto"));
         if (type == "cpu") {
-            VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+            VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
             encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
             return vnxvideo_err_ok;
         }
@@ -342,13 +342,13 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_
             try {
                 encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg_Auto(profile.c_str(), preset.c_str(), fps, quality.c_str());
                 if (encoder->ptr == nullptr) {
-                    VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+                    VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
                     encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
                 }
             }
             catch (const VnxVideo::XHWDeviceNotSupported&) {
                 VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "Failed to create hw accelerated video encoder, CPU encoder is going to be used";
-                VnxVideo::PVideoEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+                VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
                 encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
             }
             return vnxvideo_err_ok;
@@ -363,13 +363,13 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_
 }
 vnxvideo_rawproc_t vnxvideo_h264_encoder_to_rawproc(vnxvideo_h264_encoder_t e) {
     return vnxvideo_rawproc_t{
-        static_cast<VnxVideo::IRawProc*>(reinterpret_cast<VnxVideo::IVideoEncoder*>(e.ptr))
+        static_cast<VnxVideo::IRawProc*>(reinterpret_cast<VnxVideo::IMediaEncoder*>(e.ptr))
     };
 }
 int vnxvideo_h264_encoder_subscribe(vnxvideo_h264_encoder_t encoder,
     vnxvideo_on_buffer_t handle_data, void* usrptr) {
     try {
-        auto e = reinterpret_cast<VnxVideo::IVideoEncoder*>(encoder.ptr);
+        auto e = reinterpret_cast<VnxVideo::IMediaEncoder*>(encoder.ptr);
         if (handle_data != nullptr)
             e->Subscribe([=](VnxVideo::IBuffer* b, uint64_t ts) { handle_data(usrptr, vnxvideo_buffer_t{ b }, ts); });
         else
@@ -614,18 +614,18 @@ int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder) {
     }
 }
 void vnxvideo_decoder_free(vnxvideo_decoder_t decoder) {
-    auto p = reinterpret_cast<VnxVideo::IVideoDecoder*>(decoder.ptr);
+    auto p = reinterpret_cast<VnxVideo::IMediaDecoder*>(decoder.ptr);
     delete p;
 }
 int vnxvideo_decoder_subscribe(vnxvideo_decoder_t decoder,
     vnxvideo_on_frame_format_t handle_format, void* usrptr_format,
     vnxvideo_on_raw_sample_t handle_sample, void* usrptr_data) {
-    return vnxvideo_template_rawvideo_subscribe<VnxVideo::IVideoDecoder>(decoder, 
+    return vnxvideo_template_rawvideo_subscribe<VnxVideo::IMediaDecoder>(decoder, 
         handle_format, usrptr_format, handle_sample, usrptr_data);
 }
 int vnxvideo_decoder_decode(vnxvideo_decoder_t decoder, vnxvideo_buffer_t buffer, uint64_t timestamp) {
     try {
-        auto d = reinterpret_cast<VnxVideo::IVideoDecoder*>(decoder.ptr);
+        auto d = reinterpret_cast<VnxVideo::IMediaDecoder*>(decoder.ptr);
         auto b = reinterpret_cast<VnxVideo::IBuffer*>(buffer.ptr);
         d->Decode(b, timestamp);
         return vnxvideo_err_ok;
@@ -637,7 +637,7 @@ int vnxvideo_decoder_decode(vnxvideo_decoder_t decoder, vnxvideo_buffer_t buffer
 }
 int vnxvideo_decoder_flush(vnxvideo_decoder_t decoder) {
     try {
-        auto d = reinterpret_cast<VnxVideo::IVideoDecoder*>(decoder.ptr);
+        auto d = reinterpret_cast<VnxVideo::IMediaDecoder*>(decoder.ptr);
         d->Flush();
         return vnxvideo_err_ok;
     }

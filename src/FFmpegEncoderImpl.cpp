@@ -13,7 +13,7 @@ extern "C" {
 }
 
 
-class CFFmpegEncoderImpl : public VnxVideo::IVideoEncoder
+class CFFmpegEncoderImpl : public VnxVideo::IMediaEncoder
 {
 private:
     const std::string m_profile;
@@ -258,11 +258,11 @@ private:
 namespace VnxVideo {
     ECodecImpl encoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_QSV, ECodecImpl::ECI_CPU };
 
-    IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci) {
+    IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci) {
         return new CFFmpegEncoderImpl(profile, preset, fps, quality, eci);
     }
 
-    IVideoEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality) {
         const char* const hwEncoderEnv = getenv("VNX_HW_ENCODER");
         if (hwEncoderEnv != 0 && strncmp(hwEncoderEnv, "0", 1) == 0 ) {
             return nullptr;

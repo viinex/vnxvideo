@@ -105,9 +105,9 @@ private:
     VnxVideo::PRawTransform m_impl;
 };
 
-class CAsyncVideoEncoder : public VnxVideo::IVideoEncoder, private CAsyncProc {
+class CAsyncVideoEncoder : public VnxVideo::IMediaEncoder, private CAsyncProc {
 public:
-    CAsyncVideoEncoder(VnxVideo::PVideoEncoder enc)
+    CAsyncVideoEncoder(VnxVideo::PMediaEncoder enc)
         : CAsyncProc(enc)
         , m_impl(enc)
     {
@@ -128,7 +128,7 @@ public:
         m_impl->Subscribe(onBuffer);
     }
 private:
-    VnxVideo::PVideoEncoder m_impl;
+    VnxVideo::PMediaEncoder m_impl;
 };
 #pragma warning(pop)
 
@@ -136,7 +136,7 @@ namespace VnxVideo {
     IRawTransform* CreateAsyncTransform(PRawTransform tform) {
         return new CAsyncTransform(tform);
     }
-    IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc) {
+    IMediaEncoder* CreateAsyncVideoEncoder(PMediaEncoder enc) {
         return new CAsyncVideoEncoder(enc);
     }
 }

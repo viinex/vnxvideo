@@ -68,14 +68,14 @@ namespace VnxVideo
     VNXVIDEO_DECLSPEC IVideoDeviceManager* CreateVideoDeviceManager_DirectShow();
     VNXVIDEO_DECLSPEC IVideoDeviceManager* CreateVideoDeviceManager_V4L();
 
-    class IVideoDecoder {
+    class IMediaDecoder {
     public:
-        virtual ~IVideoDecoder() {}
+        virtual ~IMediaDecoder() {}
         virtual void Subscribe(TOnFormatCallback onFormat, TOnFrameCallback onFrame) = 0;
         virtual void Decode(IBuffer* nalu, uint64_t timestamp) = 0;
         virtual void Flush() = 0;
     };
-    typedef std::shared_ptr<IVideoDecoder> PVideoDecoder;
+    typedef std::shared_ptr<IMediaDecoder> PMediaDecoder;
 
     enum ECodecImpl { 
         ECI_CPU = 0, 
@@ -85,9 +85,9 @@ namespace VnxVideo
         ECI_D3D11VA = 8,
     };
 
-    VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_FFmpegH264();
-    VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_FFmpegHEVC();
-    VNXVIDEO_DECLSPEC IVideoDecoder* CreateVideoDecoder_OpenH264();
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegH264();
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegHEVC();
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_OpenH264();
 
     class IRawProc {
     public:
@@ -98,19 +98,19 @@ namespace VnxVideo
     };
     typedef std::shared_ptr<IRawProc> PRawProc;
 
-    class IVideoEncoder: public IRawProc {
+    class IMediaEncoder: public IRawProc {
     public:
         virtual void Subscribe(TOnBufferCallback onBuffer) = 0;
     };
-    typedef std::shared_ptr<IVideoEncoder> PVideoEncoder;
+    typedef std::shared_ptr<IMediaEncoder> PMediaEncoder;
 
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality);
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
     // create encoder of specific hw accelerator implementation
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci);
     // automatically choose supported hw accelerator implementation
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality);
-    VNXVIDEO_DECLSPEC IVideoEncoder* CreateAsyncVideoEncoder(PVideoEncoder enc);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateAsyncVideoEncoder(PMediaEncoder enc);
 
     class ITranscoder {
     public:

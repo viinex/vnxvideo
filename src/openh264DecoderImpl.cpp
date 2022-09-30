@@ -6,7 +6,7 @@
 #include "openh264Common.h"
 #include "RawSample.h"
 
-class COpenH264Decoder : public VnxVideo::IVideoDecoder
+class COpenH264Decoder : public VnxVideo::IMediaDecoder
 {
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
@@ -102,7 +102,7 @@ private:
 };
 
 namespace VnxVideo {
-    VnxVideo::IVideoDecoder* CreateVideoDecoder_OpenH264() {
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_OpenH264() {
         return new COpenH264Decoder();
     }
 }

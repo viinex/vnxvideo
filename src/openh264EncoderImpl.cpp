@@ -12,7 +12,7 @@ extern "C" {
 }
 
 
-class COpenH264Encoder : public VnxVideo::IVideoEncoder
+class COpenH264Encoder : public VnxVideo::IMediaEncoder
 {
 private:
     const std::string m_profile;
@@ -241,7 +241,7 @@ private:
 };
 
 namespace VnxVideo {
-    IVideoEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality) {
         return new COpenH264Encoder(profile, preset, fps, quality);
     }
 }
