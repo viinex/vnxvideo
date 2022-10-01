@@ -22,7 +22,10 @@ namespace VnxVideo
     class IRawSample {
     public:
         virtual ~IRawSample() {}
-        virtual void GetFormat(EColorspace &csp, int &width, int &height) = 0;
+        virtual void GetFormat(ERawMediaFormat &, int &, int &) = 0;
+        // ^^ Width and height are returned in 2nd and 3rd parameters for video media formats,
+        // and number of samples and number of audio channels are returned for audio media format(s).
+        // See also comment for TOnFormatCallback.
         virtual void GetData(int* strides, uint8_t** planes) = 0;
         virtual IRawSample* Dup() = 0; // make a shallow copy, ie share the same underlying raw buffer
     };
@@ -30,7 +33,12 @@ namespace VnxVideo
 
     VNXVIDEO_DECLSPEC IRawSample* CopyRawToI420(IRawSample*);
 
-    typedef typename std::function<void(EColorspace csp, int width, int height)> TOnFormatCallback;
+    typedef typename std::function<void(ERawMediaFormat emf, int, int)> TOnFormatCallback;
+    // ^^ A (new, as of 2022-10-01) convention on TOnFormatCallback.
+    // For video media formats, arguments represent width and height of image,
+    // in particular for that of luma plane in case of YUV formats with chroma planes
+    // smaller than luma. This (video-related) behavior was not changed.
+    // For audio format(s), arguments represent sample rate (2nd arg) and number of audio channels (3rd arg).
     typedef typename std::function<void(IRawSample*, uint64_t)> TOnFrameCallback;
     typedef typename std::function<void(IBuffer*, uint64_t)> TOnBufferCallback;
     typedef typename std::function<void(const std::string& json, uint64_t)> TOnJsonCallback;
@@ -92,7 +100,7 @@ namespace VnxVideo
     class IRawProc {
     public:
         virtual ~IRawProc() {}
-        virtual void SetFormat(EColorspace csp, int width, int height) = 0;
+        virtual void SetFormat(ERawMediaFormat csp, int width, int height) = 0;
         virtual void Process(IRawSample* sample, uint64_t timestamp) = 0;
         virtual void Flush() = 0;
     };
@@ -180,7 +188,7 @@ namespace VnxVideo
     class IImageAnalytics {
     public:
         virtual ~IImageAnalytics() {}
-        virtual void SetFormat(EColorspace csp, int width, int height) = 0;
+        virtual void SetFormat(ERawMediaFormat csp, int width, int height) = 0;
         virtual std::string Process(VnxVideo::IRawSample* sample) = 0;
     };
 

@@ -11,7 +11,7 @@ AVCodecID codecIdFromSubtype(EMediaSubtype subtype) {
     case EMST_PCMA: return AV_CODEC_ID_PCM_ALAW;
     case EMST_OPUS: return AV_CODEC_ID_OPUS;
     case EMST_AAC: return AV_CODEC_ID_AAC;
-    case EMST_WAV: return AV_CODEC_ID_PCM_S16LE;
+    //case EMST_LPCM: return AV_CODEC_ID_PCM_S16LE;
     }
     throw std::runtime_error("unhandled case in codecIdFromSubtype: "+std::to_string((int)subtype));
 }
@@ -118,23 +118,31 @@ std::shared_ptr<AVPacket> avpacketAlloc() {
     return std::shared_ptr<AVPacket>(av_packet_alloc(), [](AVPacket* p) { av_packet_free(&p); });
 }
 
-EColorspace fromAVPixelFormat(AVPixelFormat format) {
+ERawMediaFormat fromAVPixelFormat(AVPixelFormat format) {
     switch (format) {
     case AV_PIX_FMT_YUVJ420P: // dont know how it differs from AV_PIX_FMT_YUV420P
-    case AV_PIX_FMT_YUV420P: return EMF_I420; break;
-    case AV_PIX_FMT_YUV422P: return EMF_YV12; break;
-    case AV_PIX_FMT_NV12: return EMF_NV12; break;
-    case AV_PIX_FMT_NV21: return EMF_NV21; break;
-    case AV_PIX_FMT_YUYV422: return EMF_YUY2; break;
-    case AV_PIX_FMT_UYVY422: return EMF_UYVY; break;
-    case AV_PIX_FMT_YUV410P: return EMF_YVU9; break;
+    case AV_PIX_FMT_YUV420P: return EMF_I420;
+    case AV_PIX_FMT_YUV422P: return EMF_YV12;
+    case AV_PIX_FMT_NV12: return EMF_NV12;
+    case AV_PIX_FMT_NV21: return EMF_NV21;
+    case AV_PIX_FMT_YUYV422: return EMF_YUY2;
+    case AV_PIX_FMT_UYVY422: return EMF_UYVY;
+    case AV_PIX_FMT_YUV410P: return EMF_YVU9;
 
-    case AV_PIX_FMT_RGB24: return EMF_RGB24; break;
-    case AV_PIX_FMT_RGBA: return EMF_RGB32; break;
+    case AV_PIX_FMT_RGB24: return EMF_RGB24;
+    case AV_PIX_FMT_RGBA: return EMF_RGB32;
     case AV_PIX_FMT_BGR565BE:
     case AV_PIX_FMT_BGR565LE:
     case AV_PIX_FMT_BGR555LE:
-    case AV_PIX_FMT_BGR555BE: return EMF_RGB16; break;
+    case AV_PIX_FMT_BGR555BE: return EMF_RGB16;
+
+    default: return EMF_NONE;
+    }
+}
+ERawMediaFormat fromAVSampleFormat(AVSampleFormat format) {
+    switch (format) {
+    case AV_SAMPLE_FMT_S16: return EMF_LPCM; break;
+
     default: return EMF_NONE;
     }
 }
@@ -151,8 +159,22 @@ AVPixelFormat toAVPixelFormat(EColorspace csp) {
     case EMF_RGB24: return AV_PIX_FMT_RGB24;
     case EMF_RGB32: return AV_PIX_FMT_RGBA;
     case EMF_RGB16: return AV_PIX_FMT_BGR565LE;
+
     default: return AV_PIX_FMT_NONE;
     }
+}
+AVSampleFormat toAVSampleFormat(ERawMediaFormat emf) {
+    switch (emf) {
+    case EMF_LPCM: return AV_SAMPLE_FMT_S16;
+    default: return AV_SAMPLE_FMT_NONE;
+    }
+}
+
+int toAVFormat(ERawMediaFormat emf) {
+    if (emf < EMF_LPCM)
+        return toAVPixelFormat(emf);
+    else
+        return toAVSampleFormat(emf);
 }
 
 int nplanesByAVPixelFormat(AVPixelFormat format) {
@@ -175,6 +197,14 @@ int nplanesByAVPixelFormat(AVPixelFormat format) {
     }
 }
 
+int bitsPerSampleByAVSampleFormat(AVSampleFormat format) {
+    switch (format) {
+    case AV_SAMPLE_FMT_S16: return 2;
+    default: return 0;
+    }
+}
+
+
 CAvcodecRawSample::CAvcodecRawSample() {
     m_frame.reset(av_frame_alloc(), [](AVFrame* f) { av_frame_free(&f); });
 }
@@ -187,10 +217,17 @@ CAvcodecRawSample::CAvcodecRawSample(std::shared_ptr<AVFrame> f): m_frame(f) {
 VnxVideo::IRawSample* CAvcodecRawSample::Dup() {
     return new CAvcodecRawSample(m_frame);
 }
-void CAvcodecRawSample::GetFormat(EColorspace &csp, int &width, int &height) {
-    csp = fromAVPixelFormat((AVPixelFormat)m_frame->format);
-    width = m_frame->width;
-    height = m_frame->height;
+void CAvcodecRawSample::GetFormat(ERawMediaFormat &emf, int &x, int &y) {
+    if (m_frame->width > 0 && m_frame->height > 0 && (AVPixelFormat)m_frame->format != AV_PIX_FMT_NONE) {
+        emf = fromAVPixelFormat((AVPixelFormat)m_frame->format);
+        x = m_frame->width;
+        y = m_frame->height;
+    }
+    else if (m_frame->channels > 0 && m_frame->sample_rate > 0 && (AVSampleFormat)m_frame->format != AV_SAMPLE_FMT_NONE) {
+        emf = fromAVSampleFormat((AVSampleFormat)m_frame->format);
+        x = m_frame->nb_samples;
+        y = m_frame->channels;
+    }
 }
 void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
     int nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);

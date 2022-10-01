@@ -60,7 +60,7 @@ extern "C" {
         EMST_PCMA = 32, // same as above
         EMST_OPUS = 64,
         EMST_AAC = 128,
-        EMST_WAV = 256, // default 16 bps signed le 48000 samples per second
+        EMST_LPCM = 256,
     } EMediaSubtype;
 
     // a few supported media formats
@@ -76,8 +76,13 @@ extern "C" {
         , EMF_P422 // YUV planar 4:2:2. Could not find appropriate FOURCC
         , EMF_P440 // YUV planar 4:4:0, meaning that all chroma readings are taken from 1st line
         , EMF_GRAY // YUV 4:0:0
-    } EColorspace;
-    typedef int(*vnxvideo_on_frame_format_t)(void* usrptr, EColorspace csp, int width, int height);
+
+        , EMF_LPCM = 32, // default 16 bps signed le
+    } ERawMediaFormat;
+    typedef ERawMediaFormat EColorspace; // backwards compatibility
+
+    typedef int(*vnxvideo_on_frame_format_t)(void* usrptr, ERawMediaFormat emf, int width, int height); 
+    // ^ args: width and height of luma plane for video, sample rate and number of channels for audio
     typedef int(*vnxvideo_on_buffer_t)(void* usrptr, vnxvideo_buffer_t buffer, uint64_t timestamp);
     typedef int(*vnxvideo_on_raw_sample_t)(void* usrptr, vnxvideo_raw_sample_t buffer, uint64_t timestamp);
     typedef int(*vnxvideo_on_json_t)(void* usrptr, const char* json_buffer, int json_buffer_size, uint64_t timestamp);
