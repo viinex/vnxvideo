@@ -147,7 +147,7 @@ ERawMediaFormat fromAVSampleFormat(AVSampleFormat format) {
     }
 }
 
-AVPixelFormat toAVPixelFormat(EColorspace csp) {
+AVPixelFormat toAVPixelFormat(ERawMediaFormat csp) {
     switch (csp) {
     case EMF_I420: return AV_PIX_FMT_YUV420P;
     case EMF_YV12: return AV_PIX_FMT_YUV422P;
@@ -199,7 +199,7 @@ int nplanesByAVPixelFormat(AVPixelFormat format) {
 
 int bitsPerSampleByAVSampleFormat(AVSampleFormat format) {
     switch (format) {
-    case AV_SAMPLE_FMT_S16: return 2;
+    case AV_SAMPLE_FMT_S16: return 16;
     default: return 0;
     }
 }
@@ -214,29 +214,36 @@ CAvcodecRawSample::CAvcodecRawSample(const AVFrame* f) {
 CAvcodecRawSample::CAvcodecRawSample(std::shared_ptr<AVFrame> f): m_frame(f) {
 }
 
+bool avfrmIsVideo(AVFrame* frm) {
+    return frm->width > 0 && frm->height > 0 && (AVPixelFormat)frm->format != AV_PIX_FMT_NONE;
+}
+bool avfrmIsAudio(AVFrame* frm) {
+    return frm->channels > 0 && frm->sample_rate > 0 && (AVSampleFormat)frm->format != AV_SAMPLE_FMT_NONE;
+}
+
 VnxVideo::IRawSample* CAvcodecRawSample::Dup() {
     return new CAvcodecRawSample(m_frame);
 }
 void CAvcodecRawSample::GetFormat(ERawMediaFormat &emf, int &x, int &y) {
-    if (m_frame->width > 0 && m_frame->height > 0 && (AVPixelFormat)m_frame->format != AV_PIX_FMT_NONE) {
+    if (avfrmIsVideo(m_frame.get())) {
         emf = fromAVPixelFormat((AVPixelFormat)m_frame->format);
         x = m_frame->width;
         y = m_frame->height;
     }
-    else if (m_frame->channels > 0 && m_frame->sample_rate > 0 && (AVSampleFormat)m_frame->format != AV_SAMPLE_FMT_NONE) {
+    else if (avfrmIsAudio(m_frame.get())) {
         emf = fromAVSampleFormat((AVSampleFormat)m_frame->format);
         x = m_frame->nb_samples;
         y = m_frame->channels;
     }
 }
 void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
-    int nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);
+    int nplanes=0;
+    if (avfrmIsVideo(m_frame.get()))
+        nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);
+    else if (avfrmIsAudio(m_frame.get()))
+        nplanes = 1;
     memcpy(strides, m_frame->linesize, nplanes * sizeof(int));
     memcpy(planes, m_frame->data, nplanes * sizeof(uint8_t*));
-}
-void CAvcodecRawSample::GetData(uint8_t* &data, int& size) {
-    data = nullptr;
-    size = 0;
 }
 AVFrame* CAvcodecRawSample::GetAVFrame() {
     return m_frame.get();

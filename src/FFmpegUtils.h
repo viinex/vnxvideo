@@ -30,11 +30,13 @@ std::shared_ptr<AVPacket> avpacketAlloc();
 
 ERawMediaFormat fromAVPixelFormat(AVPixelFormat format);
 ERawMediaFormat fromAVSampleFormat(AVSampleFormat format);
-AVPixelFormat toAVPixelFormat(ERawMediaFormat csp);
-AVSampleFormat toAVSampleFormat(ERawMediaFormat csp);
+AVPixelFormat toAVPixelFormat(ERawMediaFormat emf);
+AVSampleFormat toAVSampleFormat(ERawMediaFormat emf);
 int toAVFormat(ERawMediaFormat csp);
 int nplanesByAVPixelFormat(AVPixelFormat format);
 int bitsPerSampleByAVSampleFormat(AVSampleFormat format);
+bool avfrmIsVideo(AVFrame* frm);
+bool avfrmIsAudio(AVFrame* frm);
 
 
 class CAvcodecRawSample : public VnxVideo::IRawSample {
@@ -44,9 +46,8 @@ public:
     CAvcodecRawSample(std::shared_ptr<AVFrame> f);
 
     VnxVideo::IRawSample* Dup();
-    virtual void GetFormat(EColorspace &csp, int &width, int &height);
+    virtual void GetFormat(ERawMediaFormat &, int &, int &);
     virtual void GetData(int* strides, uint8_t** planes);
-    virtual void GetData(uint8_t* &data, int& size);
     AVFrame* GetAVFrame();
 private:
     std::shared_ptr<AVFrame> m_frame;

@@ -77,7 +77,7 @@ public:
         nalu->GetData(pkt.data, pkt.size);
         ret = avcodec_send_packet(m_cc.get(), &pkt);
         if (ret < 0) {
-            VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioDecoder::Decode: Failed to avcodec_send_packet: "
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioDecoder::Decode: Failed to avcodec_send_packet: "
                 << ret << ": " << fferr2str(ret);
             return;
         }
@@ -101,11 +101,12 @@ private:
             if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
                 return;
             else if (ret < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioDecoder::fetchDecoded: Failed to avcodec_receive_frame: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioDecoder::fetchDecoded: Failed to avcodec_receive_frame: "
                     << ret << ": " << fferr2str(ret);
                 return;
             }
             else {
+                //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "fetch decoded audio: fmt: " << m_frm->format << " nbsamples: " << m_frm->nb_samples << " channels: " << m_frm->channels;
                 if (!m_onFormatCalled) {
                     m_onFormat(EMF_LPCM, m_cc->sample_rate, m_channels);
                     m_onFormatCalled = true;
@@ -127,11 +128,15 @@ private:
     VnxVideo::TOnFrameCallback m_onFrame;
 };
 
+const int kAUDIO_FRAMES_PER_SECOND = 50; // 1000 s/ms / default frame length of 20 ms for Opus
+
 class CFFmpegAudioEncoder : public VnxVideo::IMediaEncoder {
 public:
     CFFmpegAudioEncoder(EMediaSubtype output) 
         : m_output(output) 
         , m_onBuffer([](...) {})
+        , m_frm(avframeAlloc())
+        , m_pkt(avpacketAlloc())
     {
 
     }
@@ -139,38 +144,88 @@ public:
         m_onBuffer = onBuffer;
     }
     virtual void SetFormat(ERawMediaFormat emf, int sample_rate, int channels) {
+        if (m_output == EMST_LPCM)
+            return;
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: about to create audio encoder, output=" 
+            << m_output
+            << ", input emf=" << emf << ", sample_rate=" << sample_rate << ", channels=" << channels;
         m_cc = createAvEncoderContext(codecIdFromSubtype(m_output),
             [&](AVCodecContext& cc) {
-            if (m_cc.get()) {
-
-                cc.sample_rate = sample_rate;
-                cc.sample_fmt = toAVSampleFormat(emf);
-                cc.bit_rate = 8*sample_rate*channels*bitsPerSampleByAVSampleFormat(cc.sample_fmt);
-                if (m_output == EMST_OPUS) {
-                    cc.bit_rate = 32000 * channels;
-                }
-                cc.channels = channels;
-                cc.time_base = {1, 1000};
-                if (m_output == EMST_OPUS) {
-                    cc.channel_layout = ff_vorbis_channel_layouts[channels - 1];
-                    int ret = av_opt_set_double(&cc, "frame_duration", 0.02, AV_OPT_SEARCH_CHILDREN);
-                    if (ret < 0) {
-                        VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::SetFormat: Failed to set opus frame duration: "
-                            << ret << ": " << fferr2str(ret);
-                    }
-                }
-                else {
-                    cc.channel_layout = 0x8000000000000000ULL; // m_ccInput->channel_layout;
+            cc.sample_rate = sample_rate;
+            cc.sample_fmt = toAVSampleFormat(emf);
+            if (m_output == EMST_OPUS) {
+                //cc.bit_rate = 32000 * channels;
+            }
+            cc.channels = channels;
+            cc.time_base = {1, 1000};
+            if (m_output == EMST_OPUS) {
+                cc.channel_layout = ff_vorbis_channel_layouts[cc.channels - 1];
+                int ret = av_opt_set_double(&cc, "frame_duration", 1000.0 / double(kAUDIO_FRAMES_PER_SECOND), AV_OPT_SEARCH_CHILDREN);
+                if (ret < 0) {
+                    VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: Failed to set opus frame duration: "
+                        << ret << ": " << fferr2str(ret);
                 }
             }
-            else
-                setDefaultParams(m_channels, m_output, cc);
+            else {
+                cc.channel_layout = 0x8000000000000000ULL; // m_ccInput->channel_layout;
+            }
         });
+
+        m_channels = channels;
+        m_sampleRate = sample_rate;
+        m_samplesPerFrame = sample_rate / kAUDIO_FRAMES_PER_SECOND;
+        m_format = toAVSampleFormat(emf);
+        m_bytesPerFrame = m_samplesPerFrame * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
+        m_ticksPerFrame = 1000 / kAUDIO_FRAMES_PER_SECOND;
+        m_buffer.reserve(m_bytesPerFrame);
+
+        m_frm->nb_samples = m_samplesPerFrame;
+        m_frm->channels = m_channels;
+        m_frm->sample_rate = m_sampleRate;
+        m_frm->format = m_format;
+        m_frm->linesize[0] = m_bytesPerFrame;
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
-        sample->GetData(m_frm->linesize, m_frm->data);
-        m_frm->pts = timestamp;
-        sendFrame(*m_frm.get());
+        int strides[4];
+        uint8_t* data[4];
+        sample->GetData(strides, data);
+
+        uint8_t* cur = data[0];
+        uint8_t* end = cur + m_samplesPerFrame;
+
+        // if there was a leftover -- fill it up to full frame size and process
+        if (!m_buffer.empty()) {
+            int bytesMissing = m_bytesPerFrame - m_buffer.size();
+            m_buffer.insert(m_buffer.end(), cur, cur + bytesMissing);
+
+            m_frm->data[0] = &m_buffer[0];
+            m_frm->pts = m_bufferTimestamp;
+
+            cur += bytesMissing;
+            timestamp += bytesMissing * m_ticksPerFrame / m_bytesPerFrame;
+
+            sendFrame(*m_frm.get());
+
+            m_buffer.clear();
+        }
+
+        // process full audio frames w/o copying while possible
+        while (cur + m_samplesPerFrame <= end) {
+            m_frm->data[0] = cur;
+            m_frm->pts = timestamp;
+
+            cur += m_samplesPerFrame;
+            timestamp += m_ticksPerFrame;
+
+            sendFrame(*m_frm.get());
+        }
+
+        // save leftover, if any, for further processing
+        if (cur != end) {
+            m_buffer.insert(m_buffer.end(), cur, end);
+            m_bufferTimestamp = timestamp;
+        }
+
     }
     virtual void Flush() {
         m_frm->linesize[0] = 0;
@@ -217,6 +272,13 @@ private:
     std::shared_ptr<AVFrame> m_frm;
     std::shared_ptr<AVPacket> m_pkt;
     VnxVideo::TOnBufferCallback m_onBuffer;
+
+    AVSampleFormat m_format;
+    int m_samplesPerFrame;
+    int m_bytesPerFrame;
+    uint64_t m_ticksPerFrame;
+    std::vector<uint8_t> m_buffer;
+    uint64_t m_bufferTimestamp;
 };
 
 class CFFmpegAudioTranscoder: public VnxVideo::ITranscoder {
@@ -237,9 +299,7 @@ public:
         );
     }
     ~CFFmpegAudioTranscoder() {
-        m_decoder->Flush();
         m_decoder->Subscribe([](...) {}, [](...) {});
-        m_encoder->Flush();
     }
 private:
     std::shared_ptr<VnxVideo::IMediaEncoder> m_encoder;
