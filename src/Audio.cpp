@@ -154,7 +154,7 @@ public:
             cc.sample_rate = sample_rate;
             cc.sample_fmt = toAVSampleFormat(emf);
             if (m_output == EMST_OPUS) {
-                //cc.bit_rate = 32000 * channels;
+                cc.bit_rate = 64000 * channels;
             }
             cc.channels = channels;
             cc.time_base = {1, 1000};
@@ -191,12 +191,15 @@ public:
         sample->GetData(strides, data);
 
         uint8_t* cur = data[0];
-        uint8_t* end = cur + m_samplesPerFrame;
+        uint8_t* end = cur + strides[0];
 
         // if there was a leftover -- fill it up to full frame size and process
         if (!m_buffer.empty()) {
             int bytesMissing = m_bytesPerFrame - m_buffer.size();
-            m_buffer.insert(m_buffer.end(), cur, cur + bytesMissing);
+            m_buffer.insert(m_buffer.end(), cur, std::min(end, cur + bytesMissing));
+
+            if (m_buffer.size() != m_bytesPerFrame)
+                return; // nothing to process yet, whole input saved as leftover
 
             m_frm->data[0] = &m_buffer[0];
             m_frm->pts = m_bufferTimestamp;
@@ -210,11 +213,11 @@ public:
         }
 
         // process full audio frames w/o copying while possible
-        while (cur + m_samplesPerFrame <= end) {
+        while (cur + m_bytesPerFrame <= end) {
             m_frm->data[0] = cur;
             m_frm->pts = timestamp;
 
-            cur += m_samplesPerFrame;
+            cur += m_bytesPerFrame;
             timestamp += m_ticksPerFrame;
 
             sendFrame(*m_frm.get());
