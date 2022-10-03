@@ -23,9 +23,17 @@
 struct SRawSampleMsg {
     uint64_t pointer; // it's ptrdiff_t but we want 32 and 64-bit processes to be binary compatible wrt this struct
     uint64_t timestamp;
-    int width;
-    int height;
-    EColorspace colorspace;
+    union {
+        int param1;
+        int width;
+        int sample_rate;
+    };
+    union {
+        int param2;
+        int height;
+        int channels;
+    };
+    ERawMediaFormat format;
     int nplanes;
     int offsets[4];
     int strides[4];
@@ -215,7 +223,7 @@ public:
         SRawSampleMsg& m = conn->out;
         uint8_t* planes[4];
         m.timestamp = m_timestamp;
-        m_sample->GetFormat(m.colorspace, m.width, m.height);
+        m_sample->GetFormat(m.format, m.param1, m.param2);
         m_sample->GetData(m.strides, planes);
         uint8_t* p0 = planes[0];
         for (int k = 0; k < 4; ++k)
@@ -318,7 +326,11 @@ public:
 
         , m_width(0)
         , m_height(0)
-        , m_csp(EColorspace::EMF_NONE)
+        , m_formatVideo(EColorspace::EMF_NONE)
+
+        , m_sampleRate(0)
+        , m_channels(0)
+        , m_formatAudio(EColorspace::EMF_NONE)
 
         , m_running(false)
     {
@@ -420,19 +432,30 @@ public:
 
     void sendSample() {
         std::unique_lock<std::mutex> lock(m_mutex);
-        const bool formatUnchanged = (m_width == m_sample.width) 
-            && (m_height == m_sample.height) && (m_csp == m_sample.colorspace);
-        if (!formatUnchanged) {
+        const bool formatUnchangedVideo = !vnxvideo_emf_is_video(m_sample.format) ||
+            ((m_width == m_sample.width) 
+                && (m_height == m_sample.height) && (m_formatVideo == m_sample.format));
+        const bool formatUnchangedAudio = !vnxvideo_emf_is_audio(m_sample.format) ||
+            ((m_sampleRate == m_sample.sample_rate)
+                && (m_channels == m_sample.channels) && (m_formatVideo == m_sample.format));
+        if (!formatUnchangedVideo) {
             m_width = m_sample.width;
             m_height = m_sample.height;
-            m_csp = m_sample.colorspace;
+            m_formatVideo = m_sample.format;
+        }
+        if (!formatUnchangedAudio) {
+            m_sampleRate = m_sample.sample_rate;
+            m_channels = m_sample.channels;
+            m_formatAudio = m_sample.format;
         }
         auto onFrame(m_onFrame);
         auto onFormat(m_onFormat);
         lock.unlock();
-        if (!formatUnchanged)
-            onFormat(m_csp, m_width, m_height);
-        
+        if (!formatUnchangedVideo)
+            onFormat(m_formatVideo, m_width, m_height);
+        if (!formatUnchangedAudio)
+            onFormat(m_formatAudio, m_sampleRate, m_channels);
+
         uint8_t *planes[4];
         memset(planes, 0, sizeof planes);
         // fill samples in here.
@@ -448,7 +471,7 @@ public:
             std::unique_lock<std::mutex> lock(shared->mutex);
             shared->free.push_back(s);
         }); 
-        CRawSample sample(m_csp, m_width, m_height, m_sample.strides, planes, sharedDtor);
+        CRawSample sample(m_sample.format, m_sample.param1, m_sample.param2, m_sample.strides, planes, sharedDtor);
         uint64_t timestamp = m_sample.timestamp;
         onFrame(&sample, timestamp);
     }
@@ -486,7 +509,11 @@ private:
 
     int m_width;
     int m_height;
-    EColorspace m_csp;
+    ERawMediaFormat m_formatVideo;
+
+    int m_sampleRate;
+    int m_channels;
+    ERawMediaFormat m_formatAudio;
 public: // IVideoSource
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
         std::unique_lock<std::mutex> lock(m_mutex);

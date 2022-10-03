@@ -56,23 +56,30 @@ public:
         , m_transform(transform)
     {
         if (m_transform) {
-            m_transform->Subscribe([renderer,input](EColorspace csp, int w, int h) {
-                renderer->InputSetFormat(input, csp, w, h);
+            m_transform->Subscribe([renderer,input](ERawMediaFormat emf, int w, int h) {
+                renderer->InputSetFormat(input, emf, w, h);
             }, 
             [renderer, input](VnxVideo::IRawSample* s, uint64_t ts) {
                 renderer->InputSetSample(input, s, ts);
             });
         }
     }
-    virtual void SetFormat(EColorspace csp, int width, int height) {
-        if (m_transform)
-            m_transform->SetFormat(csp, width, height);
+    virtual void SetFormat(ERawMediaFormat emf, int width, int height) {
+        if (m_transform && vnxvideo_emf_is_video(emf))
+            m_transform->SetFormat(emf, width, height);
         else
-            m_renderer->InputSetFormat(m_input, csp, width, height);
+            m_renderer->InputSetFormat(m_input, emf, width, height);
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
-        if (m_transform)
-            m_transform->Process(sample, timestamp);
+        if (m_transform) {
+            ERawMediaFormat emf;
+            int x, y;
+            sample->GetFormat(emf, x, y);
+            if (vnxvideo_emf_is_video(emf))
+                m_transform->Process(sample, timestamp);
+            else
+                m_renderer->InputSetSample(m_input, sample, timestamp);
+        }
         else
             m_renderer->InputSetSample(m_input, sample, timestamp);
     }
@@ -104,6 +111,7 @@ public:
         , m_onFrame([](...) {})
         , m_rendererImplMixinProxy(new CRendererImplMixinProxy(this))
         , m_allocator(allocator)
+        , m_audioOnFormatCalled(false)
     {
 
     }
@@ -155,6 +163,17 @@ public:
         }
         m_cond.notify_all();
     }
+    void UpdateAudioLayout(int sample_rate, int channels, const VnxVideo::TAudioLayout& layout) {
+        if (sample_rate != 0 || channels != 0 || layout.size() > 1) {
+            throw std::runtime_error("Renderer only supports reproducing of at most one audio input with unchanged sample rate and number of channels");
+        }
+        m_audioOnFormatCalled = false;
+        m_audioLayout = std::shared_ptr<VnxVideo::TAudioLayout>(new VnxVideo::TAudioLayout(layout));
+        if (layout.empty())
+            m_audioChannel = -1;
+        else
+            m_audioChannel = layout[0].input;
+    }
     void SetBackground(uint8_t* backgroundColor, VnxVideo::IRawSample* backgroundImage) {
         std::unique_lock<std::mutex> lock(m_mutex);
         if(nullptr != backgroundImage){
@@ -205,15 +224,33 @@ public:
         return new CRendererInput(m_rendererImplMixinProxy, index, transform);
     }
     virtual void InputSetFormat(int input, EColorspace csp, int width, int height) {
-
+        std::unique_lock<std::mutex> lock(m_mutex);
+        if (input == m_audioChannel && vnxvideo_emf_is_audio(csp)) {
+            m_audioOnFormatCalled = false;
+        }
     }
     virtual void InputSetSample(int input, VnxVideo::IRawSample* sample, uint64_t timestamp) {
         std::unique_lock<std::mutex> lock(m_mutex);
         if ((input < 0) || (input >= m_samples.size()))
             throw std::logic_error("CRenderer::InputSetSample() input index out of range");
-        m_samples[input] = { VnxVideo::PRawSample(sample->Dup()), timestamp };
-        m_dirty = true;
-        m_cond.notify_all();
+        ERawMediaFormat emf;
+        int x, y;
+        sample->GetFormat(emf, x, y);
+        if (vnxvideo_emf_is_video(emf)) {
+            m_samples[input] = { VnxVideo::PRawSample(sample->Dup()), timestamp };
+            m_dirty = true;
+            m_cond.notify_all();
+        }
+        else if (input == m_audioChannel) {
+            VnxVideo::TOnFrameCallback onFrame(m_onFrame);
+            VnxVideo::TOnFormatCallback onFormat(m_onFormat);
+            bool callOnFormat = !m_audioOnFormatCalled;
+            m_audioOnFormatCalled = true;
+            lock.unlock();
+            if (callOnFormat)
+                onFormat(emf, x, y);
+            onFrame(sample, timestamp);
+        }
     }
 
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
@@ -521,6 +558,10 @@ private:
     std::shared_ptr<VnxVideo::TLayout> m_layout;
     std::shared_ptr<TSwsContexts> m_swsContexts;
     std::vector<std::pair<VnxVideo::PRawSample, uint64_t> > m_samples;
+
+    std::shared_ptr<VnxVideo::TAudioLayout> m_audioLayout;
+    int m_audioChannel;
+    bool m_audioOnFormatCalled;
 
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;

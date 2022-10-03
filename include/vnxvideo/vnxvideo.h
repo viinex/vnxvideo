@@ -81,6 +81,9 @@ extern "C" {
     } ERawMediaFormat;
     typedef ERawMediaFormat EColorspace; // backwards compatibility
 
+    VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_video(ERawMediaFormat emf);
+    VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_audio(ERawMediaFormat emf);
+
     typedef int(*vnxvideo_on_frame_format_t)(void* usrptr, ERawMediaFormat emf, int width, int height); 
     // ^ args: width and height of luma plane for video, sample rate and number of channels for audio
     typedef int(*vnxvideo_on_buffer_t)(void* usrptr, vnxvideo_buffer_t buffer, uint64_t timestamp);

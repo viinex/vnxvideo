@@ -851,6 +851,21 @@ static void deserializeLayout(const char* json_layout, VnxVideo::TLayout& layout
     }
 }
 
+static void deserializeAudioLayout(const char* json_layout, VnxVideo::TAudioLayout& layout) {
+    json j;
+    std::string s(json_layout);
+    std::stringstream ss(s);
+    ss >> j;
+    if (!j.is_array())
+        throw std::runtime_error("deserializeAudioLayout(): top-level value should be a json array of audio channel descriptions");
+    for (auto jj : j) {
+        VnxVideo::AudioInput a;
+        a.input = jget<int>(jj, "input", -1);
+        a.gain = jget<float>(jj, "gain", 1.0f);
+        layout.push_back(a);
+    }
+}
+
 VNXVIDEO_DECLSPEC int vnxvideo_renderer_update_layout(vnxvideo_renderer_t renderer,
     int width, int height, uint8_t* backgroundColor, vnxvideo_raw_sample_t backgroundImage, 
     vnxvideo_raw_sample_t nosignalImage, const char* layout) {
@@ -864,7 +879,22 @@ VNXVIDEO_DECLSPEC int vnxvideo_renderer_update_layout(vnxvideo_renderer_t render
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_renderer_create: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_renderer_update_layout: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
+VNXVIDEO_DECLSPEC int vnxvideo_renderer_update_audio_layout(vnxvideo_renderer_t renderer,
+    int sample_rate, int channels, const char* layout) {
+    VnxVideo::IRenderer* r(reinterpret_cast<VnxVideo::IRenderer*>(renderer.ptr));
+    try {
+        VnxVideo::TAudioLayout l;
+        deserializeAudioLayout(layout, l);
+        r->UpdateAudioLayout(sample_rate, channels, l);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_renderer_update_audio_layout: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
 }
@@ -1072,4 +1102,11 @@ VNXVIDEO_DECLSPEC int vnxvideo_transcoder_process(vnxvideo_transcoder_t transcod
         return vnxvideo_err_invalid_parameter;
     }
 
+}
+
+VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_video(ERawMediaFormat emf) {
+    return emf < EMF_LPCM;
+}
+VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_audio(ERawMediaFormat emf) {
+    return emf >= EMF_LPCM;
 }

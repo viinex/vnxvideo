@@ -210,6 +210,12 @@ namespace VnxVideo
     };
     typedef std::vector<VnxVideo::Viewport> TLayout;
 
+    struct AudioInput {
+        int input;
+        float gain;
+    };
+    typedef std::vector<VnxVideo::AudioInput> TAudioLayout;
+
     class IRenderer: IVideoSource {
     public:
         virtual IRawProc* CreateInput(int index, VnxVideo::PRawTransform transform) = 0;
@@ -217,6 +223,7 @@ namespace VnxVideo
             VnxVideo::IRawSample* nosignalImage, const TLayout& layout) = 0;
         virtual void SetBackground(uint8_t* backgroundColor, VnxVideo::IRawSample* backgroundImage) =0;
         virtual void SetNosignal(VnxVideo::IRawSample* backgroundImage) = 0;
+        virtual void UpdateAudioLayout(int sample_rate, int channels, const TAudioLayout& layout) = 0;
     };
     VNXVIDEO_DECLSPEC IRenderer* CreateRenderer(int refresh_rate);
 
