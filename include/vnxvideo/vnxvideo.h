@@ -207,6 +207,8 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_background(vnxvideo_renderer_t renderer, 
         uint8_t* backgroundColor, vnxvideo_raw_sample_t backgroundImage);
     VNXVIDEO_DECLSPEC int vnxvideo_renderer_set_nosignal(vnxvideo_renderer_t renderer, vnxvideo_raw_sample_t nosignalImage);
+    VNXVIDEO_DECLSPEC int vnxvideo_renderer_update_audio_layout(vnxvideo_renderer_t renderer,
+        int sample_rate, int channels, const char* layout);
 
     VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_str(const char* name, int maxSizeMB, vnxvideo_action_t action, void* usrptr);
     VNXVIDEO_DECLSPEC int vnxvideo_with_shm_allocator_ptr(vnxvideo_allocator_t allocator, vnxvideo_action_t action, void* usrptr);
