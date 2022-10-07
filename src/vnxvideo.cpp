@@ -310,7 +310,7 @@ int vnxvideo_rawproc_flush(vnxvideo_rawproc_t proc) {
     }
 }
 
-int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_t* encoder) {
+int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* encoder) {
     try {
         json j;
         std::string s(json_config);
@@ -366,7 +366,7 @@ vnxvideo_rawproc_t vnxvideo_h264_encoder_to_rawproc(vnxvideo_h264_encoder_t e) {
         static_cast<VnxVideo::IRawProc*>(reinterpret_cast<VnxVideo::IMediaEncoder*>(e.ptr))
     };
 }
-int vnxvideo_h264_encoder_subscribe(vnxvideo_h264_encoder_t encoder,
+int vnxvideo_encoder_subscribe(vnxvideo_encoder_t encoder,
     vnxvideo_on_buffer_t handle_data, void* usrptr) {
     try {
         auto e = reinterpret_cast<VnxVideo::IMediaEncoder*>(encoder.ptr);
@@ -1061,12 +1061,43 @@ VNXVIDEO_DECLSPEC int vnxvideo_vmsplugin_get_snapshot(vnxvideo_vmsplugin_t vmspl
 
 }
 
-VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(int channels,
-    EMediaSubtype input, const char* inputDetails,
-    EMediaSubtype output, const char* outputDetails,
+VNXVIDEO_DECLSPEC int vnxvideo_audio_encoder_create(EMediaSubtype output, const char* json_config, vnxvideo_encoder_t* encoder) {
+    try {
+        encoder->ptr = VnxVideo::CreateAudioEncoder(output);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_audio_encoder_create: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+VNXVIDEO_DECLSPEC int vnxvideo_create_audio_decoder(EMediaSubtype input,
+    int channels, const uint8_t *extradata, int extradata_length,
+    vnxvideo_decoder_t* decoder) {
+    try {
+        std::vector<uint8_t> vextradata;
+        if (extradata && extradata_length) {
+            vextradata.insert(vextradata.end(), extradata, extradata + extradata_length);
+        }
+        decoder->ptr = VnxVideo::CreateAudioDecoder(input, channels, vextradata);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_create_audio_decoder: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
+
+VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(EMediaSubtype output,
+    EMediaSubtype input, int channels, const uint8_t *extradata, int extradata_length,
     vnxvideo_transcoder_t* transcoder) {
     try {
-        transcoder->ptr = VnxVideo::CreateAudioTranscoder(channels, input, inputDetails, output, outputDetails);
+        std::vector<uint8_t> vextradata;
+        if (extradata && extradata_length) {
+            vextradata.insert(vextradata.end(), extradata, extradata + extradata_length);
+        }
+        transcoder->ptr = VnxVideo::CreateAudioTranscoder(output, input, channels, vextradata);
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {

@@ -28,7 +28,8 @@ extern "C" {
     typedef struct { void* ptr; } vnxvideo_allocator_t;
 
     typedef struct { void* ptr; } vnxvideo_rawproc_t; // raw processor - a superclass
-    typedef struct { void* ptr; } vnxvideo_h264_encoder_t;
+    typedef struct { void* ptr; } vnxvideo_encoder_t;
+    typedef vnxvideo_encoder_t vnxvideo_h264_encoder_t;
     typedef struct { void* ptr; } vnxvideo_h264_source_t;
     typedef struct { void* ptr; } vnxvideo_media_source_t;
     typedef struct { void* ptr; } vnxvideo_composer_t;
@@ -158,9 +159,12 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_rawproc_flush(vnxvideo_rawproc_t proc);
 
 
-    VNXVIDEO_DECLSPEC int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_h264_encoder_t* encoder);
-    VNXVIDEO_DECLSPEC vnxvideo_rawproc_t vnxvideo_h264_encoder_to_rawproc(vnxvideo_h264_encoder_t); // cast, not duplication
-    VNXVIDEO_DECLSPEC int vnxvideo_h264_encoder_subscribe(vnxvideo_h264_encoder_t encoder, 
+    VNXVIDEO_DECLSPEC int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* encoder);
+    VNXVIDEO_DECLSPEC int vnxvideo_audio_encoder_create(EMediaSubtype output, const char* json_config, 
+        vnxvideo_encoder_t* encoder);
+
+    VNXVIDEO_DECLSPEC vnxvideo_rawproc_t vnxvideo_encoder_to_rawproc(vnxvideo_encoder_t); // cast, not duplication
+    VNXVIDEO_DECLSPEC int vnxvideo_encoder_subscribe(vnxvideo_encoder_t encoder, 
         vnxvideo_on_buffer_t handle_data, void* usrptr); // each data buffer is a NAL unit
 
     VNXVIDEO_DECLSPEC int vnxvideo_composer_create(const char* json_config, vnxvideo_composer_t* composer);

@@ -25,37 +25,16 @@ const uint64_t ff_vorbis_channel_layouts[9] = {
     0x3f,
 };
 
-template <typename A> void setDefaultParams(int channels, EMediaSubtype t, A& av) {
-    //const uint64_t layout = (1 << m_channels) - 1; // m_channels lowest bits set to 1
-    const uint64_t layout = 0x8000000000000000ULL;  //AV_CH_LAYOUT_NATIVE
-    switch (t) {
-    case EMST_PCMU:
-    case EMST_PCMA:
-        av.sample_rate = 8000;
-        break;
-    case EMST_OPUS:
-        av.sample_rate = 48000;
-        break;
-    case EMST_AAC:
-        av.sample_rate = 48000;
-        break;
-    default:
-        return;
-    }
-    av.channels = channels;
-    av.channel_layout = layout;
-}
-
 class CFFmpegAudioDecoder : public VnxVideo::IMediaDecoder {
 public:
-    CFFmpegAudioDecoder(int channels, EMediaSubtype input)
-        : m_channels(channels)
-        , m_input(input)
+    CFFmpegAudioDecoder(EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata)
+        : m_input(input)
         , m_onFrame([](...) {})
         , m_onFormat([](...) {})
         , m_frm(avframeAlloc())
         , m_pkt(avpacketAlloc())
-        , m_onFormatCalled(false)
+        , m_sample_rate(0)
+        , m_channels(0)
     {
         m_cc = createAvDecoderContext(codecIdFromSubtype(input),
             [&](AVCodecContext& cc) {
@@ -64,7 +43,8 @@ public:
     }
 
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
-        m_onFormatCalled = false;
+        m_sample_rate = 0;
+        m_channels = 0;
         m_onFormat = onFormat;
         m_onFrame = onFrame;
     }
@@ -107,23 +87,48 @@ private:
             }
             else {
                 //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "fetch decoded audio: fmt: " << m_frm->format << " nbsamples: " << m_frm->nb_samples << " channels: " << m_frm->channels;
-                if (!m_onFormatCalled) {
-                    m_onFormat(EMF_LPCM, m_cc->sample_rate, m_channels);
-                    m_onFormatCalled = true;
+                if (m_sample_rate != m_frm->sample_rate || m_channels != m_frm->channels) {
+                    m_onFormat(EMF_LPCM, m_frm->sample_rate, m_frm->channels);
+
+                    m_sample_rate = m_frm->sample_rate;
+                    m_channels = m_frm->channels;
                 }
                 CAvcodecRawSample sample(m_frm.get());
                 m_onFrame(&sample, m_frm->pts);
             }
         }
     }
+    static void setDefaultParams(int channels, EMediaSubtype t, AVCodecContext& av) {
+        //const uint64_t layout = (1 << m_channels) - 1; // m_channels lowest bits set to 1
+        const uint64_t layout = 0x8000000000000000ULL;  //AV_CH_LAYOUT_NATIVE
+        switch (t) {
+        case EMST_PCMU:
+        case EMST_PCMA:
+            av.sample_rate = 8000;
+            break;
+        case EMST_OPUS:
+            av.sample_rate = 48000;
+            break;
+        case EMST_AAC:
+            av.sample_rate = 48000;
+            break;
+        default:
+            return;
+        }
+        if (channels) {
+            av.channels = channels;
+        }
+        av.channel_layout = layout;
+    }
+
 private:
-    const int m_channels;
     const EMediaSubtype m_input;
     std::shared_ptr<AVCodecContext> m_cc;
     std::shared_ptr<AVFrame> m_frm;
     std::shared_ptr<AVPacket> m_pkt;
 
-    bool m_onFormatCalled;
+    int m_sample_rate;
+    int m_channels;
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
 };
@@ -195,7 +200,7 @@ public:
 
         // if there was a leftover -- fill it up to full frame size and process
         if (!m_buffer.empty()) {
-            int bytesMissing = m_bytesPerFrame - m_buffer.size();
+            int bytesMissing = m_bytesPerFrame - (int)m_buffer.size();
             m_buffer.insert(m_buffer.end(), cur, std::min(end, cur + bytesMissing));
 
             if (m_buffer.size() != m_bytesPerFrame)
@@ -292,9 +297,9 @@ public:
     virtual void Process(VnxVideo::IBuffer* nalu, uint64_t timestamp) {
         m_decoder->Decode(nalu, timestamp);
     }
-    CFFmpegAudioTranscoder(int channels, EMediaSubtype input, EMediaSubtype output)
+    CFFmpegAudioTranscoder(EMediaSubtype output, EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata)
         : m_encoder(new CFFmpegAudioEncoder(output))
-        , m_decoder(new CFFmpegAudioDecoder(channels, input))
+        , m_decoder(new CFFmpegAudioDecoder(input, channels, extradata))
     {
         m_decoder->Subscribe(
             std::bind(&VnxVideo::IRawProc::SetFormat, m_encoder, _1, _2, _3),
@@ -310,9 +315,16 @@ private:
 };
 
 namespace VnxVideo {
-    VNXVIDEO_DECLSPEC ITranscoder* CreateAudioTranscoder(int channels,
-        EMediaSubtype input, const char* inputDetails,
-        EMediaSubtype output, const char* outputDetails) {
-        return new CFFmpegAudioTranscoder(channels, input, output);
+    VNXVIDEO_DECLSPEC ITranscoder* CreateAudioTranscoder(EMediaSubtype output, 
+        EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata) {
+        return new CFFmpegAudioTranscoder(output, input, channels, extradata);
+    }
+
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateAudioEncoder(EMediaSubtype output) {
+        return new CFFmpegAudioEncoder(output);
+    }
+
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateAudioDecoder(EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata) {
+        return new CFFmpegAudioDecoder(input, channels, extradata);
     }
 }
