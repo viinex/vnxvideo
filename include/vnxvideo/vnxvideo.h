@@ -260,9 +260,13 @@ extern "C" {
     VNXVIDEO_DECLSPEC vnxvideo_h264_source_t  vnxvideo_media_source_to_h264(vnxvideo_media_source_t);
     VNXVIDEO_DECLSPEC vnxvideo_media_source_t vnxvideo_h264_source_to_media(vnxvideo_h264_source_t);
 
-    VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(int channels,
-        EMediaSubtype input, const char* inputDetails,
-        EMediaSubtype output, const char* outputDetails,
+    VNXVIDEO_DECLSPEC int vnxvideo_audio_decoder_create(EMediaSubtype input,
+        int channels, const uint8_t *extradata, int extradata_length,
+        vnxvideo_decoder_t* decoder);
+    VNXVIDEO_DECLSPEC int vnxvideo_audio_encoder_create(EMediaSubtype output, const char* json_config, vnxvideo_encoder_t* encoder);
+
+    VNXVIDEO_DECLSPEC int vnxvideo_audio_transcoder_create(EMediaSubtype output,
+        EMediaSubtype input, int channels, const uint8_t *extradata, int extradata_length,
         vnxvideo_transcoder_t* transcoder);
     VNXVIDEO_DECLSPEC void vnxvideo_transcoder_free(vnxvideo_transcoder_t transcoder);
     VNXVIDEO_DECLSPEC int vnxvideo_transcoder_subscribe(vnxvideo_transcoder_t transcoder,

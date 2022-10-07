@@ -1071,7 +1071,7 @@ VNXVIDEO_DECLSPEC int vnxvideo_audio_encoder_create(EMediaSubtype output, const 
         return vnxvideo_err_invalid_parameter;
     }
 }
-VNXVIDEO_DECLSPEC int vnxvideo_create_audio_decoder(EMediaSubtype input,
+VNXVIDEO_DECLSPEC int vnxvideo_audio_decoder_create(EMediaSubtype input,
     int channels, const uint8_t *extradata, int extradata_length,
     vnxvideo_decoder_t* decoder) {
     try {
@@ -1083,13 +1083,13 @@ VNXVIDEO_DECLSPEC int vnxvideo_create_audio_decoder(EMediaSubtype input,
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_create_audio_decoder: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_audio_decoder_create: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
 }
 
 
-VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(EMediaSubtype output,
+VNXVIDEO_DECLSPEC int vnxvideo_audio_transcoder_create(EMediaSubtype output,
     EMediaSubtype input, int channels, const uint8_t *extradata, int extradata_length,
     vnxvideo_transcoder_t* transcoder) {
     try {
@@ -1101,7 +1101,7 @@ VNXVIDEO_DECLSPEC int vnxvideo_create_audio_transcoder(EMediaSubtype output,
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_create_audio_transcoder: " << e.what();
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_audio_transcoder_create: " << e.what();
         return vnxvideo_err_invalid_parameter;
     }
 }
