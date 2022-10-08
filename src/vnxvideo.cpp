@@ -361,7 +361,7 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* en
         return vnxvideo_err_invalid_parameter;
     }
 }
-vnxvideo_rawproc_t vnxvideo_h264_encoder_to_rawproc(vnxvideo_h264_encoder_t e) {
+vnxvideo_rawproc_t vnxvideo_encoder_to_rawproc(vnxvideo_h264_encoder_t e) {
     return vnxvideo_rawproc_t{
         static_cast<VnxVideo::IRawProc*>(reinterpret_cast<VnxVideo::IMediaEncoder*>(e.ptr))
     };
