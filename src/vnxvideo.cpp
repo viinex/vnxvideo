@@ -1136,8 +1136,8 @@ VNXVIDEO_DECLSPEC int vnxvideo_transcoder_process(vnxvideo_transcoder_t transcod
 }
 
 VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_video(ERawMediaFormat emf) {
-    return emf < EMF_LPCM;
+    return emf < EMF_AUDIO;
 }
 VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_audio(ERawMediaFormat emf) {
-    return emf >= EMF_LPCM;
+    return emf > EMF_AUDIO;
 }

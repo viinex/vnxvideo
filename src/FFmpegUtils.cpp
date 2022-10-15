@@ -141,7 +141,12 @@ ERawMediaFormat fromAVPixelFormat(AVPixelFormat format) {
 }
 ERawMediaFormat fromAVSampleFormat(AVSampleFormat format) {
     switch (format) {
-    case AV_SAMPLE_FMT_S16: return EMF_LPCM; break;
+    case AV_SAMPLE_FMT_S16:  return EMF_LPCM16;
+    case AV_SAMPLE_FMT_S32:  return EMF_LPCM32;
+    case AV_SAMPLE_FMT_FLT:  return EMF_LPCMF;
+    case AV_SAMPLE_FMT_S16P: return EMF_LPCM16P;
+    case AV_SAMPLE_FMT_S32P: return EMF_LPCM32P;
+    case AV_SAMPLE_FMT_FLTP: return EMF_LPCMFP;
 
     default: return EMF_NONE;
     }
@@ -165,16 +170,23 @@ AVPixelFormat toAVPixelFormat(ERawMediaFormat csp) {
 }
 AVSampleFormat toAVSampleFormat(ERawMediaFormat emf) {
     switch (emf) {
-    case EMF_LPCM: return AV_SAMPLE_FMT_S16;
+    case EMF_LPCM16:  return AV_SAMPLE_FMT_S16;
+    case EMF_LPCM32:  return AV_SAMPLE_FMT_S32;
+    case EMF_LPCMF:   return AV_SAMPLE_FMT_FLT;
+    case EMF_LPCM16P: return AV_SAMPLE_FMT_S16P;
+    case EMF_LPCM32P: return AV_SAMPLE_FMT_S32P;
+    case EMF_LPCMFP:  return AV_SAMPLE_FMT_FLTP;
     default: return AV_SAMPLE_FMT_NONE;
     }
 }
 
 int toAVFormat(ERawMediaFormat emf) {
-    if (emf < EMF_LPCM)
+    if (vnxvideo_emf_is_video(emf))
         return toAVPixelFormat(emf);
-    else
+    else if (vnxvideo_emf_is_audio(emf))
         return toAVSampleFormat(emf);
+    else
+        return -1;
 }
 
 int nplanesByAVPixelFormat(AVPixelFormat format) {

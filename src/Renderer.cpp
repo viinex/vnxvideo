@@ -437,6 +437,9 @@ private:
             int h;
             src->GetFormat(csp, w, h);
             AVPixelFormat avPixFmt = AV_PIX_FMT_NONE;
+            if (vnxvideo_emf_is_audio(csp)) {
+                continue;
+            }
             if (csp != EMF_I420 && csp != EMF_NV12) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::doRender(): unsupported input sample format: " << csp;
                 continue;

@@ -77,8 +77,13 @@ extern "C" {
         , EMF_P422 // YUV planar 4:2:2. Could not find appropriate FOURCC
         , EMF_P440 // YUV planar 4:4:0, meaning that all chroma readings are taken from 1st line
         , EMF_GRAY // YUV 4:0:0
-
-        , EMF_LPCM = 32, // default 16 bps signed le
+        , EMF_AUDIO = 31 // reserved and never used value
+        , EMF_LPCM16 // default 16 bps signed le
+        , EMF_LPCM32
+        , EMF_LPCMF
+        , EMF_LPCM16P // planar
+        , EMF_LPCM32P
+        , EMF_LPCMFP
     } ERawMediaFormat;
     typedef ERawMediaFormat EColorspace; // backwards compatibility
 

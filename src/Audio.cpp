@@ -88,7 +88,7 @@ private:
             else {
                 //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "fetch decoded audio: fmt: " << m_frm->format << " nbsamples: " << m_frm->nb_samples << " channels: " << m_frm->channels;
                 if (m_sample_rate != m_frm->sample_rate || m_channels != m_frm->channels) {
-                    m_onFormat(EMF_LPCM, m_frm->sample_rate, m_frm->channels);
+                    m_onFormat(fromAVSampleFormat((AVSampleFormat)m_frm->format), m_frm->sample_rate, m_frm->channels);
 
                     m_sample_rate = m_frm->sample_rate;
                     m_channels = m_frm->channels;
