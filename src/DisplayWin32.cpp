@@ -401,6 +401,8 @@ private:
     }
 public:
     virtual void SetFormat(EColorspace csp, int width, int height) {
+        if (!vnxvideo_emf_is_video(csp))
+            return;
         std::unique_lock<std::mutex> lock(m_mutex);
         m_csp = csp;
         m_width = width;

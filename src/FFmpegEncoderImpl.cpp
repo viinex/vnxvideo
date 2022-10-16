@@ -51,6 +51,8 @@ public:
         m_onBuffer = onBuffer;
     }
     void SetFormat(EColorspace csp, int width, int height) {
+        if (!vnxvideo_emf_is_video(csp))
+            return;
         m_csp = csp;
         m_width = width;
         m_height = height;
@@ -71,6 +73,13 @@ public:
         m_onBuffer(&b, ts);
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
+        ERawMediaFormat emf;
+        int width, height;
+        sample->GetFormat(emf, width, height);
+        if (!vnxvideo_emf_is_video(emf)) {
+            return;
+        }
+
         try {
             checkCreateCc();
         }

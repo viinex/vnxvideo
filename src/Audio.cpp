@@ -149,6 +149,8 @@ public:
         m_onBuffer = onBuffer;
     }
     virtual void SetFormat(ERawMediaFormat emf, int sample_rate, int channels) {
+        if (!vnxvideo_emf_is_audio(emf))
+            return;
         if (m_output == EMST_LPCM)
             return;
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: about to create audio encoder, output=" 

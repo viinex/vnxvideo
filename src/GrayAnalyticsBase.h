@@ -15,6 +15,8 @@ public:
     {
     }
     void SetFormat(EColorspace csp, int w, int h) {
+        if (!vnxvideo_emf_is_video(csp))
+            return;
         if (csp == EMF_I420 || csp == EMF_YV12 || csp == EMF_NV12 || csp == EMF_NV21) {
             m_width = w;
             m_height = h;
