@@ -193,6 +193,12 @@ public:
         m_frm->linesize[0] = m_bytesPerFrame;
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
+        ERawMediaFormat format;
+        int sampleRate, channels;
+        sample->GetFormat(format, sampleRate, channels);
+        if (!vnxvideo_emf_is_audio(format))
+            return;
+
         int strides[4];
         uint8_t* data[4];
         sample->GetData(strides, data);
