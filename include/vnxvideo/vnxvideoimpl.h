@@ -186,6 +186,12 @@ namespace VnxVideo
     VNXVIDEO_DECLSPEC IAnalytics* CreateAnalytics_Basic(const std::vector<float>& roi, float framerate, 
         bool too_bright, bool too_dark, bool too_blurry, float motion, bool scene_change);
 
+    class IRawProcChain : public IRawProc {
+    public:
+        virtual void Link(IRawProc*) = 0;
+    };
+    VNXVIDEO_DECLSPEC IRawProcChain* CreateRawProcChain();
+
 
     class IImageAnalytics {
     public:

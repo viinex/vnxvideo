@@ -707,6 +707,34 @@ int vnxvideo_analytics_subscribe(vnxvideo_analytics_t analytics,
     }
 }
 
+int vnxvideo_rawproc_chain_create(vnxvideo_rawproc_chain_t* chain) {
+    try {
+        chain->ptr = VnxVideo::CreateRawProcChain();
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_rawproc_chain_create: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+    return vnxvideo_err_ok;
+}
+VNXVIDEO_DECLSPEC vnxvideo_rawproc_t vnxvideo_rawproc_chain_to_rawproc(vnxvideo_rawproc_chain_t chain) {
+    return vnxvideo_rawproc_t{
+        static_cast<VnxVideo::IRawProc*>(reinterpret_cast<VnxVideo::IRawProcChain*>(chain.ptr))
+    };
+}
+VNXVIDEO_DECLSPEC int vnxvideo_rawproc_chain_link(vnxvideo_rawproc_chain_t chain, vnxvideo_rawproc_t link) {
+    try {
+        auto c = reinterpret_cast<VnxVideo::IRawProcChain*>(chain.ptr);
+        auto l = reinterpret_cast<VnxVideo::IRawProc*>(link.ptr);
+        c->Link(l);
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_rawproc_chain_link: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+    return vnxvideo_err_ok;
+}
+
 int vnxvideo_rawtransform_create(const char* json_config, vnxvideo_rawtransform_t* transform) {
     try {
         json j;

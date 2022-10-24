@@ -34,6 +34,7 @@ extern "C" {
     typedef struct { void* ptr; } vnxvideo_media_source_t;
     typedef struct { void* ptr; } vnxvideo_composer_t;
     typedef struct { void* ptr; } vnxvideo_analytics_t; // video analysis
+    typedef struct { void* ptr; } vnxvideo_rawproc_chain_t;
     typedef struct { void* ptr; } vnxvideo_imganalytics_t; // still image analysis, with no respect to timestamps and previous history
     typedef struct { void* ptr; } vnxvideo_rawtransform_t;
 
@@ -181,6 +182,10 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_analytics_subscribe(vnxvideo_analytics_t analytics, 
         vnxvideo_on_json_t handle_json, void* usrptr_json, // json for rare events
         vnxvideo_on_buffer_t handle_binary, void* usrptr_binary); // binary buffer for "metadata" (like tracking)
+
+    VNXVIDEO_DECLSPEC int vnxvideo_rawproc_chain_create(vnxvideo_rawproc_chain_t* chain);
+    VNXVIDEO_DECLSPEC vnxvideo_rawproc_t vnxvideo_rawproc_chain_to_rawproc(vnxvideo_rawproc_chain_t); // cast, not duplication
+    VNXVIDEO_DECLSPEC int vnxvideo_rawproc_chain_link(vnxvideo_rawproc_chain_t chain, vnxvideo_rawproc_t link);
 
     VNXVIDEO_DECLSPEC int vnxvideo_imganalytics_create(const char* json_config, vnxvideo_imganalytics_t *ian);
     VNXVIDEO_DECLSPEC void vnxvideo_imganalytics_free(vnxvideo_imganalytics_t ian);

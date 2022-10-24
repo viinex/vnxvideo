@@ -187,6 +187,7 @@
     <ClCompile Include="openh264Common.cpp" />
     <ClCompile Include="openh264DecoderImpl.cpp" />
     <ClCompile Include="openh264EncoderImpl.cpp" />
+    <ClCompile Include="RawProcChain.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="vnxvideo.cpp" />
     <ClCompile Include="Win32Utils.cpp" />
