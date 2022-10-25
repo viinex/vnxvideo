@@ -212,6 +212,11 @@ int nplanesByAVPixelFormat(AVPixelFormat format) {
 int bitsPerSampleByAVSampleFormat(AVSampleFormat format) {
     switch (format) {
     case AV_SAMPLE_FMT_S16: return 16;
+    case AV_SAMPLE_FMT_S32: return 32;
+    case AV_SAMPLE_FMT_FLT: return 32;
+    case AV_SAMPLE_FMT_S16P: return 16;
+    case AV_SAMPLE_FMT_S32P: return 32;
+    case AV_SAMPLE_FMT_FLTP: return 32;
     default: return 0;
     }
 }
@@ -244,7 +249,7 @@ void CAvcodecRawSample::GetFormat(ERawMediaFormat &emf, int &x, int &y) {
     }
     else if (avfrmIsAudio(m_frame.get())) {
         emf = fromAVSampleFormat((AVSampleFormat)m_frame->format);
-        x = m_frame->nb_samples;
+        x = m_frame->sample_rate;
         y = m_frame->channels;
     }
 }

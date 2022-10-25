@@ -198,9 +198,11 @@ public:
         sample->GetFormat(format, sampleRate, channels);
         if (!vnxvideo_emf_is_audio(format))
             return;
+        if (!m_cc)
+            return;
 
-        int strides[4];
-        uint8_t* data[4];
+        int strides[4] = { 0,0,0,0 };
+        uint8_t* data[4] = { nullptr,nullptr,nullptr,nullptr };
         sample->GetData(strides, data);
 
         uint8_t* cur = data[0];
