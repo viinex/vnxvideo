@@ -83,7 +83,7 @@ public:
         int* strides = strides_src;
         
         if (m_swsc.get()) {
-            sampleI420.reset(new CRawSample(m_width, m_height));
+            sampleI420.reset(new CRawSample(EMF_I420, m_width, m_height));
             sampleI420->GetData(strides_dst, planes_dst);
             int res = sws_scale(m_swsc.get(), planes, strides, 0, m_height, planes_dst, strides_dst);
             if (res != m_height) {

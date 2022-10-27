@@ -10,11 +10,13 @@
 
 extern "C" {
 #include <libswscale/swscale.h>
+#include <libswresample/swresample.h>
 }
 
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 #include "RawSample.h"
+#include "FFmpegUtils.h"
 
 class CRendererImplMixin {
 public:
@@ -223,10 +225,11 @@ public:
         m_samples[index]={ VnxVideo::PRawSample(), 0 };
         return new CRendererInput(m_rendererImplMixinProxy, index, transform);
     }
-    virtual void InputSetFormat(int input, EColorspace csp, int width, int height) {
+    virtual void InputSetFormat(int input, ERawMediaFormat emf, int x, int y) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (input == m_audioChannel && vnxvideo_emf_is_audio(csp)) {
+        if (input == m_audioChannel && vnxvideo_emf_is_audio(emf)) {
             m_audioOnFormatCalled = false;
+            m_audioResample.reset();
         }
     }
     virtual void InputSetSample(int input, VnxVideo::IRawSample* sample, uint64_t timestamp) {
@@ -248,8 +251,39 @@ public:
             m_audioOnFormatCalled = true;
             lock.unlock();
             if (callOnFormat)
-                onFormat(emf, x, y);
-            onFrame(sample, timestamp);
+                //onFormat(emf, x, y);
+                onFormat(EMF_LPCM16, x, y);
+            if (emf != EMF_LPCM16) {
+                int layout = y == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
+                m_audioResample.reset(swr_alloc_set_opts(nullptr,
+                    layout, AV_SAMPLE_FMT_S16, x, // todo: make this adjustable
+                    layout, toAVSampleFormat(emf), x, 0, nullptr),
+                    [](SwrContext* p) { swr_free(&p); });
+                int res = swr_init(m_audioResample.get());
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_init: " << res;
+                    m_audioResample.reset();
+                }
+            }
+            if(!m_audioResample)
+                onFrame(sample, timestamp);
+            else {
+                int strides[4] = { 0,0,0,0 }, rstrides[4] = { 0,0,0,0 };
+                uint8_t* planes[4] = { 0,0,0,0 };
+                uint8_t* rplanes[4] = { 0,0,0,0 };
+                sample->GetData(strides, planes);
+                const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(emf));
+                const int channels = y;
+                std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, nullptr, nullptr, false));
+                resampled->GetData(rstrides, rplanes);
+                uint64_t rtimestamp=swr_next_pts(m_audioResample.get(), timestamp);
+                int res=swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_convert: " << res;
+                }
+                else
+                    onFrame(resampled.get(), rtimestamp);
+            }
         }
     }
 
@@ -388,7 +422,7 @@ private:
             uint8_t* planesBg[4];
             backgroundImage->GetData(stridesBg, planesBg);
 
-            res.reset(new CRawSample(width, height, allocator));
+            res.reset(new CRawSample(EMF_I420, width, height, allocator));
             res->GetData(strides, planes);
 
             // align width and height to 8 because we'll use 32bpp-oriented function for copying with tiling
@@ -403,7 +437,7 @@ private:
             }
         }
         else {
-            res.reset(new CRawSample(width, height, allocator));
+            res.reset(new CRawSample(EMF_I420, width, height, allocator));
             res->GetData(strides, planes);
             uint8_t backgroundYuv[3];
             rgb2yuv(backgroundColorRgb, backgroundYuv);
@@ -565,6 +599,7 @@ private:
     std::shared_ptr<VnxVideo::TAudioLayout> m_audioLayout;
     int m_audioChannel;
     bool m_audioOnFormatCalled;
+    std::shared_ptr<SwrContext> m_audioResample;
 
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;

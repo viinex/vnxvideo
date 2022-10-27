@@ -103,7 +103,7 @@ public:
         uint8_t* planesIn[4];
         sample->GetData(stridesIn, planesIn);
 
-        CRawSample out(m_width, m_height);
+        CRawSample out(EMF_I420, m_width, m_height);
         int stridesOut[4];
         uint8_t* planesOut[4];
         out.GetData(stridesOut, planesOut);

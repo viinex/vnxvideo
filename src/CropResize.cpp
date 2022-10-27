@@ -35,7 +35,7 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
     uint8_t* planesSrc[4];
     s->GetData(stridesSrc, planesSrc);
 
-    VnxVideo::IRawSample* res = new CRawSample(target_width, target_height);
+    VnxVideo::IRawSample* res = new CRawSample(EMF_I420, target_width, target_height);
     int stridesDst[4];
     uint8_t* planesDst[4];
     res->GetData(stridesDst, planesDst);

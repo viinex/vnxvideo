@@ -221,6 +221,17 @@ int bitsPerSampleByAVSampleFormat(AVSampleFormat format) {
     }
 }
 
+bool isPlanarAudioFormat(AVSampleFormat format) {
+    switch (format) {
+    case AV_SAMPLE_FMT_S16:
+    case AV_SAMPLE_FMT_S32:
+    case AV_SAMPLE_FMT_FLT: return false;
+    case AV_SAMPLE_FMT_S16P:
+    case AV_SAMPLE_FMT_S32P:
+    case AV_SAMPLE_FMT_FLTP: return true;
+    default: return false;
+    }
+}
 
 CAvcodecRawSample::CAvcodecRawSample() {
     m_frame.reset(av_frame_alloc(), [](AVFrame* f) { av_frame_free(&f); });
@@ -257,8 +268,12 @@ void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
     int nplanes=0;
     if (avfrmIsVideo(m_frame.get()))
         nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);
-    else if (avfrmIsAudio(m_frame.get()))
-        nplanes = 1;
+    else if (avfrmIsAudio(m_frame.get())) {
+        if (isPlanarAudioFormat((AVSampleFormat)m_frame->format))
+            nplanes = m_frame->channels;
+        else
+            nplanes = 1;
+    }
     memcpy(strides, m_frame->linesize, nplanes * sizeof(int));
     memcpy(planes, m_frame->data, nplanes * sizeof(uint8_t*));
 }

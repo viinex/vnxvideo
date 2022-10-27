@@ -35,6 +35,7 @@ AVSampleFormat toAVSampleFormat(ERawMediaFormat emf);
 int toAVFormat(ERawMediaFormat csp);
 int nplanesByAVPixelFormat(AVPixelFormat format);
 int bitsPerSampleByAVSampleFormat(AVSampleFormat format);
+bool isPlanarAudioFormat(AVSampleFormat format);
 bool avfrmIsVideo(AVFrame* frm);
 bool avfrmIsAudio(AVFrame* frm);
 

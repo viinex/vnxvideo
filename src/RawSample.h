@@ -41,8 +41,14 @@ class CRawSample : public VnxVideo::IRawSample
 {
 private:
     const EColorspace m_csp;
-    const int m_width;
-    const int m_height;
+    union {
+        const int m_width;
+        const int m_nsamples;
+    };
+    union {
+        const int m_height;
+        const int m_nchannels;
+    };
     std::shared_ptr<uint8_t> m_data;
 
     int m_nplanes;
@@ -56,34 +62,52 @@ private:
     }
 public:
 private:
-    void Init(EColorspace csp, int width, int height, int* strides, uint8_t **planes, IAllocator* copyData)
+    void Init(ERawMediaFormat csp, int width, int height, int* strides, uint8_t **planes, IAllocator* allocate)
     {
-        if (csp != EMF_I420 && planes != nullptr && !copyData)
+        if (csp != EMF_I420 && csp < EMF_AUDIO && planes != nullptr && !allocate)
             throw std::logic_error("Sample format other than I420 is only supported when wrapping or allocating a frame");
 
-        if (copyData) {
+        if (allocate) {
             FillStridesOffsets(m_csp, m_width, m_height, m_nplanes, m_strides, m_offsets, true);
-            for (int k = 0; k < m_nplanes; ++k)
-                m_strides[k] = ceil16(m_strides[k]);
+            int size=0;
+            if (csp < EMF_AUDIO) {
+                for (int k = 0; k < m_nplanes; ++k)
+                    m_strides[k] = ceil16(m_strides[k]);
 
-            int height2 = m_height;
-            if (m_csp == EMF_I420 || m_csp == EMF_P440)
-                height2 /= 2;
-            int heights[3] = { m_height, height2, height2 };
-            // how did it come to this:
-            // see https://github.com/mozilla/mozjpeg/blob/master/turbojpeg.c#L630
-            // function tjBufSize. Both width and height are rounded up to MCU size (which is at most 16).
-            // 2048 is added then (in advance?).
-            int size = 2048;
-            for (int k = 0; k < m_nplanes; ++k)
-                size += m_strides[k] * ceil16(heights[k]);
-            m_data=copyData->Alloc(size);
+                int height2 = m_height;
+                if (m_csp == EMF_I420 || m_csp == EMF_P440)
+                    height2 /= 2;
+                int heights[3] = { m_height, height2, height2 };
+                // how did it come to this:
+                // see https://github.com/mozilla/mozjpeg/blob/master/turbojpeg.c#L630
+                // function tjBufSize. Both width and height are rounded up to MCU size (which is at most 16).
+                // 2048 is added then (in advance?).
+                size = 2048;
+                for (int k = 0; k < m_nplanes; ++k)
+                    size += m_strides[k] * ceil16(heights[k]);
+            }
+            else {
+                switch (m_csp) {
+                case EMF_LPCM16: 
+                case EMF_LPCM16P:
+                    size = m_nsamples * m_nchannels * 2;
+                    break;
+                case EMF_LPCM32:
+                case EMF_LPCM32P:
+                case EMF_LPCMF:
+                case EMF_LPCMFP:
+                    size = m_nsamples * m_nchannels * 2;
+                    break;
+                }
+            }
+            m_data = allocate->Alloc(size);
             if (nullptr == m_data)
                 throw std::runtime_error("CRawSample::Init(): Cannot allocate data buffer");
 
             if (strides && planes) {
-                uint8_t* my_planes[3] = { m_data.get() + m_offsets[0],m_data.get() + m_offsets[1], m_data.get() + m_offsets[2] };
-                CopyRawToI420(width, height, csp, planes, strides, my_planes, m_strides);
+                uint8_t* my_planes[4] = { m_data.get() + m_offsets[0], m_data.get() + m_offsets[1], m_data.get() + m_offsets[2], m_data.get() + m_offsets[3] };
+                if(csp==EMF_I420)
+                    CopyRawToI420(width, height, csp, planes, strides, my_planes, m_strides);
             }
         }
         else {
@@ -96,7 +120,20 @@ private:
         }
     }
 public:
-    CRawSample(int width, int height, IAllocator* allocator=nullptr) 
+    CRawSample(ERawMediaFormat emf, int width, int height, IAllocator* allocator = nullptr)
+        : m_csp(emf)
+        , m_width(width)
+        , m_height(height)
+    {
+        IAllocator* a = allocator;
+        if (a == nullptr)
+            a = GetPreferredShmAllocator();
+        if (a == nullptr)
+            a = g_privateAllocator;
+        Init(emf, width, height, nullptr, nullptr, a);
+    }
+    // for backwards compatibility, deprecated
+    CRawSample(int width, int height, IAllocator* allocator = nullptr)
         : m_csp(EMF_I420)
         , m_width(width)
         , m_height(height)
@@ -107,17 +144,18 @@ public:
         if (a == nullptr)
             a = g_privateAllocator;
 
-        Init(EMF_I420, width, height, nullptr, nullptr, a);
+        Init(m_csp, width, height, nullptr, nullptr, a);
     }
+
     // copyData means copy actually, into I420, only if the source data is specified;
     // otherwise copyData means allocate memory for the sample of specific size and colorspace
     CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes, bool copyData)
-        : m_csp((planes != nullptr && copyData)?EMF_I420:csp)
+        : m_csp((planes != nullptr && copyData && csp < EMF_AUDIO)?EMF_I420:csp)
         , m_width(width)
         , m_height(height)
     {
         IAllocator* a = nullptr;
-        if (copyData) {
+        if (copyData || (strides == nullptr && planes == nullptr)) {
             a = GetPreferredShmAllocator();
             if (a == nullptr)
                 a = g_privateAllocator;
@@ -153,9 +191,15 @@ public:
     }
 
 public:
-    static void FillStridesOffsets(EColorspace csp, int width, int height, int& nplanes, int* strides, ptrdiff_t* offsets, bool alignStridesAndHeights) {
+    static void FillStridesOffsets(ERawMediaFormat emf, int p1, int p2, int& nplanes, int* strides, ptrdiff_t* offsets, bool alignStridesAndHeights) {
+        const int width = p1;
+        const int height = p2;
+        const int nsamples = p1;
+        const int nchannels = p2;
         auto ceilDim = alignStridesAndHeights ? ceil16 : [](int x) {return x; };
-        switch (csp) {
+        memset(strides, 0, sizeof(int) * 4);
+        memset(offsets, 0, sizeof(ptrdiff_t) * 4);
+        switch (emf) {
         case EMF_I420:
             nplanes = 3;
             strides[0] = ceilDim(width);
@@ -215,6 +259,30 @@ public:
             offsets[0] = 0;
             offsets[1] = strides[0] * ceilDim(height);
             offsets[2] = offsets[1] + strides[1] * ceilDim(height);
+            break;
+        case EMF_LPCM16:
+            nplanes = 1;
+            strides[0] = nsamples * nchannels * 2;
+            offsets[0] = 0;
+            break;
+        case EMF_LPCM32:
+        case EMF_LPCMF:
+            nplanes = 1;
+            strides[0] = nsamples * nchannels * 4;
+            offsets[0] = 0;
+            break;
+        case EMF_LPCM16P:
+            nplanes = nchannels;
+            strides[0] = nsamples * 2; // FFmpeg convention: only first stride is set
+            for(int k=0; k < std::min<int>(nchannels, 4); ++k)
+                offsets[k] = k * nsamples * 2;
+            break;
+        case EMF_LPCM32P:
+        case EMF_LPCMFP:
+            nplanes = nchannels;
+            strides[0] = nsamples * 4;
+            for (int k = 0; k < std::min<int>(nchannels, 4); ++k)
+                offsets[k] = k * nsamples * 4;
             break;
         }
     }
