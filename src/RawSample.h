@@ -64,6 +64,10 @@ public:
 private:
     void Init(ERawMediaFormat csp, int width, int height, int* strides, uint8_t **planes, IAllocator* allocate)
     {
+        // NB: for video formats, it could be that csp!=m_csp inside of this call.
+        // which means that format conversion should be performed.
+        // m_csp would typically be EMF_I420 in such cases.
+
         if (csp != EMF_I420 && csp < EMF_AUDIO && planes != nullptr && !allocate)
             throw std::logic_error("Sample format other than I420 is only supported when wrapping or allocating a frame");
 
@@ -106,7 +110,7 @@ private:
 
             if (strides && planes) {
                 uint8_t* my_planes[4] = { m_data.get() + m_offsets[0], m_data.get() + m_offsets[1], m_data.get() + m_offsets[2], m_data.get() + m_offsets[3] };
-                if(csp==EMF_I420)
+                if(m_csp==EMF_I420) // the only case we can handle when copying video data with format conversion
                     CopyRawToI420(width, height, csp, planes, strides, my_planes, m_strides);
             }
         }

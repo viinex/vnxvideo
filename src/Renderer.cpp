@@ -234,6 +234,8 @@ public:
     }
     virtual void InputSetSample(int input, VnxVideo::IRawSample* sample, uint64_t timestamp) {
         std::unique_lock<std::mutex> lock(m_mutex);
+        if (!m_run)
+            return;
         if ((input < 0) || (input >= m_samples.size()))
             throw std::logic_error("CRenderer::InputSetSample() input index out of range");
         ERawMediaFormat emf;
