@@ -7,6 +7,7 @@ extern "C" {
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 
+#include "FFmpegUtils.h"
 #include "RawSample.h"
 
 int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
@@ -18,10 +19,6 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
     EColorspace csp;
     int width, height;
     s->GetFormat(csp, width, height);
-    if (csp != EMF_I420) {
-        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize() does not support image format " << csp;
-        return vnxvideo_err_invalid_parameter;
-    }
     if (roi_left < 0 || roi_top < 0 || roi_width <= 0 || roi_height <= 0 || target_width <= 0 || target_height <= 0) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize: roi left/top cannot be negative, roi and target size cannot be non-positive";
         return vnxvideo_err_invalid_parameter;
@@ -29,6 +26,10 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
 
     if ((roi_left + roi_width > width) || (roi_top + roi_height > height)) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize: roi size exceeds image size";
+        return vnxvideo_err_invalid_parameter;
+    }
+    if (csp != EMF_I420 && csp != EMF_NV12) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize() does not support image format " << csp;
         return vnxvideo_err_invalid_parameter;
     }
     int stridesSrc[4];
@@ -40,7 +41,8 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
     uint8_t* planesDst[4];
     res->GetData(stridesDst, planesDst);
 
-    if (roi_width == target_width && roi_height == target_height) { // size matches -- just copy the data taking ROI into account
+    if (roi_width == target_width && roi_height == target_height && csp == EMF_I420) { 
+        // size and pixel format matches -- just copy the data taking ROI into account
         for (int k = 0; k < 3; ++k) {
             int div = (k == 0) ? 1 : 2; // plane dimension size divisor wrt to original size
             IppiSize roi = { target_width / div, target_height / div };
@@ -53,13 +55,18 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
         }
     }
     else { // size does not match, resize image
-        std::shared_ptr<SwsContext> ctx(sws_getContext(roi_width, roi_height, AV_PIX_FMT_YUV420P,
+        std::shared_ptr<SwsContext> ctx(sws_getContext(roi_width, roi_height, toAVPixelFormat(csp),
             target_width, target_height, AV_PIX_FMT_YUV420P, SWS_BILINEAR, nullptr, nullptr, nullptr), sws_freeContext);
-        const uint8_t* srcs[3] = {
-            planesSrc[0] + roi_left + roi_top*stridesSrc[0],
-            planesSrc[1] + roi_left/2 + roi_top*stridesSrc[1]/2,
-            planesSrc[2] + roi_left / 2 + roi_top*stridesSrc[2] / 2
-        };
+        const uint8_t* srcs[4] = { 0,0,0,0 };
+        if(csp==EMF_I420) {
+            srcs[0] = planesSrc[0] + roi_left + roi_top*stridesSrc[0];
+            srcs[1] = planesSrc[1] + roi_left / 2 + roi_top*stridesSrc[1] / 2;
+            srcs[2] = planesSrc[2] + roi_left / 2 + roi_top*stridesSrc[2] / 2;
+        }
+        else if (csp == EMF_NV12) {
+            srcs[0] = planesSrc[0] + roi_left + roi_top*stridesSrc[0];
+            srcs[1] = planesSrc[1] + roi_left + roi_top*stridesSrc[1];
+        }
         int res=sws_scale(ctx.get(), srcs, stridesSrc, 0, roi_height, planesDst, stridesDst);
         if (res <= 0) {
             VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize: sws_scale  returned a non-ok code: " << res;
