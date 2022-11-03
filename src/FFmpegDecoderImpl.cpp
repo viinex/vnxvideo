@@ -24,9 +24,10 @@ public:
             cc.pkt_timebase = { 1,1000 };
             cc.time_base = { 1,1000 };
 
+#if defined(_WIN64) || defined(__linux__)
             AVBufferRef* hw = nullptr;
-            AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
             AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
+            AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
 
             const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
             if (hwDecoderEnv != 0 && strncmp(hwDecoderEnv, "0", 1) == 0 ) {
@@ -64,6 +65,7 @@ public:
                         cc.flags2 &= ~AV_CODEC_FLAG2_CHUNKS;
                 }
             }
+#endif
         });
     }
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
@@ -113,6 +115,7 @@ private:
         }
     }
     void fetchDecodedHw() {
+#if defined(_WIN64) || defined(__linux__)
         for (;;) {
             std::shared_ptr<AVFrame> hwfrm(avframeAlloc());
             int res = avcodec_receive_frame(m_cc.get(), hwfrm.get());
@@ -144,6 +147,7 @@ private:
             CAvcodecRawSample result(dst);
             m_onFrame(&result, dst->pts);
         }
+#endif
     }
     void callOnFormat(AVFrame* f) {
         EColorspace csp = fromAVPixelFormat((AVPixelFormat)f->format);

@@ -286,6 +286,7 @@ std::mutex g_codecImplementationsMutex;
 
 void enumHwDevices() {
     g_codecImplementations.clear();
+#if defined(_WIN64) || defined(__linux__)
     for (AVHWDeviceType t = av_hwdevice_iterate_types(AV_HWDEVICE_TYPE_NONE);
         t != AV_HWDEVICE_TYPE_NONE;
         t = av_hwdevice_iterate_types(t)) {
@@ -313,6 +314,7 @@ void enumHwDevices() {
     for (auto i : g_codecImplementations)
         ss << ", " << i.second;
     VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << ss.str();
+#endif
 }
 
 bool isCodecImplSupported(VnxVideo::ECodecImpl eci) {
@@ -330,6 +332,7 @@ void checkFramesContext(AVCodecContext& cc, int width, int height, AVPixelFormat
         return;
     if (cc.hw_frames_ctx != nullptr)
         return;
+#if defined(_WIN64) || defined(__linux__)
     AVBufferRef *hw_frames_ref = av_hwframe_ctx_alloc(cc.hw_device_ctx);
     AVHWFramesContext* frames_ctx = (AVHWFramesContext*)hw_frames_ref->data;
     frames_ctx->format = hwpixfmt;
@@ -345,4 +348,5 @@ void checkFramesContext(AVCodecContext& cc, int width, int height, AVPixelFormat
     else {
         cc.hw_frames_ctx = hw_frames_ref; // ownership transferred
     }
+#endif
 }

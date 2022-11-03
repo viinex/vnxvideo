@@ -121,6 +121,7 @@ public:
         frm->height = m_height;
         frm->pts = timestamp;
 
+#if defined(_WIN64) || defined(__linux__)
         if (m_cc->hw_frames_ctx != nullptr) {
             std::shared_ptr<AVFrame> dst(avframeAlloc());
             int res = av_hwframe_get_buffer(m_cc->hw_frames_ctx, dst.get(), 0);
@@ -139,6 +140,7 @@ public:
             dst->pts = timestamp;
             frm = dst;
         }
+#endif
 
         int ret = avcodec_send_frame(m_cc.get(), frm.get());
         if (ret < 0) {
@@ -170,9 +172,10 @@ private:
         if (m_cc.get())
             return;
         const char* encoderName = "h264";
-        AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
         AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
 
+#if defined(_WIN64) || defined(__linux__)
+        AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
         if (m_codecImpl == VnxVideo::ECodecImpl::ECI_QSV) {
             encoderName = "h264_qsv";
             hwDevType = AV_HWDEVICE_TYPE_QSV;
@@ -188,6 +191,7 @@ private:
             hwDevType = AV_HWDEVICE_TYPE_CUDA;
             hwPixFmt = AV_PIX_FMT_CUDA;
         }
+#endif
 
         m_cc = createAvEncoderContext(encoderName,
             [=](AVCodecContext& cc) {
@@ -206,25 +210,26 @@ private:
 
             int res = av_opt_set(&cc, "profile", m_profile.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set profile: "
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set profile: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set(&cc, "preset", m_preset.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set preset: "
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set preset: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set_int(&cc, "qp", m_qp, AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set qp: "
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set_int(&cc, "idr_interval", 50, AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioTranscoder::checkEncoderContext: Failed to set idr_interval: "
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set idr_interval: "
                     << res << ": " << fferr2str(res);
             }
 
+#if defined(_WIN64) || defined(__linux__)
             res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
@@ -233,6 +238,7 @@ private:
                 cc.hw_device_ctx = hw;
                 checkFramesContext(cc, m_width, m_height, hwPixFmt);
             }
+#endif
         });
     }
     static int qualityEnumToQp(const std::string& q)
