@@ -18,7 +18,7 @@ void x264log(void*, int level, const char* format, va_list args) {
     VNXVIDEO_LOG((ELogLevel)(level + 1), "x264engine") << NVnxVideoLogImpl::removecrlf(vsnprintf(buf, 255, format, args), buf);
 }
 
-class Cx264Encoder : public VnxVideo::IVideoEncoder
+class Cx264Encoder : public VnxVideo::IMediaEncoder
 {
 private:
     const std::string m_profile;
@@ -199,13 +199,13 @@ int qualityEnumToQP(const std::string& q)
 }
 
 namespace VnxVideo {
-    IVideoEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality) {
         return new Cx264Encoder(profile, preset, fps, qualityEnumToQP(quality));
     }
 }
 #else
 namespace VnxVideo {
-    IVideoEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality) {
         throw std::runtime_error("x264 encoder is not supported");
     }
 }
