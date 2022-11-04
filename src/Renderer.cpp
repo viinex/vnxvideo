@@ -267,8 +267,19 @@ public:
                     m_audioResample.reset();
                 }
             }
-            if(!m_audioResample)
-                onFrame(sample, timestamp);
+            if (!m_audioResample) {
+                if(m_allocator.get()==nullptr)
+                    onFrame(sample, timestamp);
+                else {
+                    int strides[4] = { 0,0,0,0 };
+                    uint8_t* planes[4] = { 0,0,0,0 };
+                    sample->GetData(strides, planes);
+                    const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(emf));
+                    const int channels = y;
+                    std::shared_ptr<VnxVideo::IRawSample> copy(new CRawSample(EMF_LPCM16, nsamples, channels, strides, planes, m_allocator.get()));
+                    onFrame(copy.get(), timestamp);
+                }
+            }
             else {
                 int strides[4] = { 0,0,0,0 }, rstrides[4] = { 0,0,0,0 };
                 uint8_t* planes[4] = { 0,0,0,0 };
@@ -276,7 +287,7 @@ public:
                 sample->GetData(strides, planes);
                 const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(emf));
                 const int channels = y;
-                std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, nullptr, nullptr, false));
+                std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, m_allocator.get()));
                 resampled->GetData(rstrides, rplanes);
                 uint64_t rtimestamp=swr_next_pts(m_audioResample.get(), timestamp);
                 int res=swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);

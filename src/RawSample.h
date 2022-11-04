@@ -167,6 +167,19 @@ public:
 
         Init(csp, width, height, strides, planes, a);
     }
+    CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes, IAllocator* allocator)
+        : m_csp(csp)
+        , m_width(width)
+        , m_height(height)
+    {
+        IAllocator* a = allocator;
+        if (a == nullptr)
+            a = GetPreferredShmAllocator();
+        if (a == nullptr)
+            a = g_privateAllocator;
+
+        Init(csp, width, height, strides, planes, a);
+    }
     CRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes,
                std::shared_ptr<void> underlying) // there's an underlying shared object which allows us not to copy data
         : m_csp(csp)

@@ -26,7 +26,7 @@ struct SRawSampleMsg {
     union {
         int param1;
         int width;
-        int sample_rate;
+        int nsamples;
     };
     union {
         int param2;
@@ -94,6 +94,7 @@ public:
         , m_allocator(allocator) 
         , m_timestamp(0)
         , m_shutdown(false)
+        , m_audioSampleRateShl4(0)
 #ifndef _WIN32
         , m_acceptor(m_ios)
 #endif
@@ -224,17 +225,25 @@ public:
         uint8_t* planes[4];
         m.timestamp = m_timestamp;
         m_sample->GetFormat(m.format, m.param1, m.param2);
+        if (vnxvideo_emf_is_audio(m.format)) {
+            m.param2 |= m_audioSampleRateShl4;
+        }
         m_sample->GetData(m.strides, planes);
         uint8_t* p0 = planes[0];
         for (int k = 0; k < 4; ++k)
             m.offsets[k] = (int)(planes[k] - p0);
 
-        uint64_t pointer = m_allocator->FromPointer(planes[0]);
-        m.pointer = pointer;
-        conn->samples[pointer] = m_sample;
+        try {
+            uint64_t pointer = m_allocator->FromPointer(planes[0]);
+            m.pointer = pointer;
+            conn->samples[pointer] = m_sample;
 
-        boost::asio::async_write(conn->pipe, boost::asio::buffer(&conn->out, sizeof(conn->out)),
-            boost::bind(&CLocalVideoProvider::writeHandler, this, conn, _1, _2));
+            boost::asio::async_write(conn->pipe, boost::asio::buffer(&conn->out, sizeof(conn->out)),
+                boost::bind(&CLocalVideoProvider::writeHandler, this, conn, _1, _2));
+        }
+        catch (const std::exception& x) {
+            VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "CLocalVideoProvider::sendCurrentFrame: caught exception: " << x.what();
+        }
     }
     void writeHandler(std::shared_ptr<SConnection> conn, const boost::system::error_code & ec, size_t n) {
         if (ec){
@@ -281,7 +290,12 @@ public:
             m_thread.join();
     }
 public:
-    void SetFormat(EColorspace csp, int width, int height) {}
+    void SetFormat(ERawMediaFormat emf, int x, int y) {
+        if (vnxvideo_emf_is_audio(emf)) {
+            std::unique_lock<std::mutex> lock(m_mutex);
+            m_audioSampleRateShl4 = x << 4;
+        }
+    }
     void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
@@ -312,6 +326,8 @@ private:
     std::shared_ptr<VnxVideo::IRawSample> m_sample;
     uint64_t m_timestamp;
     bool m_shutdown;
+
+    int m_audioSampleRateShl4;
 };
 
 // INPUT video channel. A local named pipe client
@@ -326,11 +342,11 @@ public:
 
         , m_width(0)
         , m_height(0)
-        , m_formatVideo(EColorspace::EMF_NONE)
+        , m_formatVideo(ERawMediaFormat::EMF_NONE)
 
-        , m_sampleRate(0)
+        , m_sampleRateShl4(0)
         , m_channels(0)
-        , m_formatAudio(EColorspace::EMF_NONE)
+        , m_formatAudio(ERawMediaFormat::EMF_NONE)
 
         , m_running(false)
     {
@@ -436,17 +452,21 @@ public:
             ((m_width == m_sample.width) 
                 && (m_height == m_sample.height) && (m_formatVideo == m_sample.format));
         const bool formatUnchangedAudio = !vnxvideo_emf_is_audio(m_sample.format) ||
-            ((m_sampleRate == m_sample.sample_rate)
-                && (m_channels == m_sample.channels) && (m_formatVideo == m_sample.format));
+            ((m_sampleRateShl4 == (m_sample.param2 & 0xfffffff0))
+                && (m_channels == (m_sample.param2 & 0x0000000f)) 
+                && (m_formatAudio == m_sample.format));
         if (!formatUnchangedVideo) {
             m_width = m_sample.width;
             m_height = m_sample.height;
             m_formatVideo = m_sample.format;
         }
         if (!formatUnchangedAudio) {
-            m_sampleRate = m_sample.sample_rate;
-            m_channels = m_sample.channels;
+            m_sampleRateShl4 = m_sample.param2 & 0xfffffff0;
+            m_channels = m_sample.param2 & 0x0000000f;
             m_formatAudio = m_sample.format;
+        }
+        if (vnxvideo_emf_is_audio(m_sample.format)) {
+            m_sample.param2 &= 0x0000000f;
         }
         auto onFrame(m_onFrame);
         auto onFormat(m_onFormat);
@@ -454,7 +474,7 @@ public:
         if (!formatUnchangedVideo)
             onFormat(m_formatVideo, m_width, m_height);
         if (!formatUnchangedAudio)
-            onFormat(m_formatAudio, m_sampleRate, m_channels);
+            onFormat(m_formatAudio, m_sampleRateShl4 >> 4, m_channels);
 
         uint8_t *planes[4];
         memset(planes, 0, sizeof planes);
@@ -511,7 +531,7 @@ private:
     int m_height;
     ERawMediaFormat m_formatVideo;
 
-    int m_sampleRate;
+    int m_sampleRateShl4;
     int m_channels;
     ERawMediaFormat m_formatAudio;
 public: // IVideoSource

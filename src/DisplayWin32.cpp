@@ -410,6 +410,11 @@ public:
         m_formatInvalidated = true;
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
+        ERawMediaFormat emf;
+        int x, y;
+        sample->GetFormat(emf, x, y);
+        if (m_csp!=emf) // ignore audio
+            return;
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
         HWND hwnd(m_hwnd);
