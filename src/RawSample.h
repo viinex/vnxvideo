@@ -450,7 +450,7 @@ public:
         int w;
         int h;
         sample->GetFormat(csp, w, h);
-        if (csp != EMF_I420) {
+        if (csp != EMF_I420 && csp != EMF_NV12) {
             throw std::logic_error("CRawSampleRoi ctor: colorspace format not supported for selecting ROI");
         }
         if (left < 0 || top < 0 || width <= 0 || height <= 0) {
@@ -471,9 +471,15 @@ public:
     }
     void GetData(int* strides, uint8_t** planes) {
         m_sample->GetData(strides, planes);
-        planes[0] += m_top*strides[0] + m_left;
-        planes[1] += (m_top / 2)*strides[1] + m_left / 2;
-        planes[2] += (m_top / 2)*strides[2] + m_left / 2;
+        if (m_csp == EMF_I420) {
+            planes[0] += m_top*strides[0] + m_left;
+            planes[1] += (m_top / 2)*strides[1] + m_left / 2;
+            planes[2] += (m_top / 2)*strides[2] + m_left / 2;
+        }
+        else if(m_csp==EMF_NV12) {
+            planes[0] += m_top*strides[0] + m_left;
+            planes[1] += m_top*strides[1] + m_left;
+        }
     }
 private:
     std::shared_ptr<VnxVideo::IRawSample> m_sample;
