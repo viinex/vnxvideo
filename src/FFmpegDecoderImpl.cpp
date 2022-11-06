@@ -80,7 +80,8 @@ public:
         int res = avcodec_send_packet(m_cc.get(), &p);
         if (0 != res)
             VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
-        fetchDecoded();
+        else
+            fetchDecoded();
     }
     virtual void Flush() {
         AVPacket p;
@@ -89,7 +90,8 @@ public:
         int res = avcodec_send_packet(m_cc.get(), &p);
         if (0 != res)
             VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
-        fetchDecoded();
+        else
+            fetchDecoded();
     }
 private:
     void fetchDecoded() {

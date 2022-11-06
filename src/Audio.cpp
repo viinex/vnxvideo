@@ -56,12 +56,11 @@ public:
         pkt.pts = timestamp;
         nalu->GetData(pkt.data, pkt.size);
         ret = avcodec_send_packet(m_cc.get(), &pkt);
-        if (ret < 0) {
+        if (ret != 0) 
             VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioDecoder::Decode: Failed to avcodec_send_packet: "
                 << ret << ": " << fferr2str(ret);
-            return;
-        }
-        fetchDecoded();
+        else
+            fetchDecoded();
     }
     void Flush() {
         AVPacket p;
@@ -70,7 +69,8 @@ public:
         int res = avcodec_send_packet(m_cc.get(), &p);
         if (0 != res)
             VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
-        fetchDecoded();
+        else
+            fetchDecoded();
 
     }
 private:

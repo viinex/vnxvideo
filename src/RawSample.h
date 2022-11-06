@@ -107,7 +107,7 @@ private:
                 case EMF_LPCM32P:
                 case EMF_LPCMF:
                 case EMF_LPCMFP:
-                    size = m_nsamples * m_nchannels * 2;
+                    size = m_nsamples * m_nchannels * 4;
                     break;
                 }
             }
