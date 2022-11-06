@@ -79,9 +79,16 @@ private:
                     m_strides[k] = ceil16(m_strides[k]);
 
                 int height2 = m_height;
-                if (m_csp == EMF_I420 || m_csp == EMF_P440)
+                int height3 = m_height;
+                if (m_csp == EMF_I420 || m_csp == EMF_P440) {
                     height2 /= 2;
-                int heights[3] = { m_height, height2, height2 };
+                    height3 = height2;
+                }
+                if (m_csp == EMF_NV12 || m_csp == EMF_NV21) {
+                    height2 /= 2;
+                    height3 = 0;
+                }
+                int heights[4] = { m_height, height2, height3, 0 };
                 // how did it come to this:
                 // see https://github.com/mozilla/mozjpeg/blob/master/turbojpeg.c#L630
                 // function tjBufSize. Both width and height are rounded up to MCU size (which is at most 16).
@@ -478,7 +485,7 @@ public:
         }
         else if(m_csp==EMF_NV12) {
             planes[0] += m_top*strides[0] + m_left;
-            planes[1] += m_top*strides[1] + m_left;
+            planes[1] += (m_top / 2)*strides[1] + (m_left & 0xfffffffe);
         }
     }
 private:

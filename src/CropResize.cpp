@@ -65,7 +65,7 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
         }
         else if (csp == EMF_NV12) {
             srcs[0] = planesSrc[0] + roi_left + roi_top*stridesSrc[0];
-            srcs[1] = planesSrc[1] + roi_left + roi_top*stridesSrc[1];
+            srcs[1] = planesSrc[1] + (roi_left & 0xfffffffe) + (roi_top / 2)*stridesSrc[1];
         }
         int res=sws_scale(ctx.get(), srcs, stridesSrc, 0, roi_height, planesDst, stridesDst);
         if (res <= 0) {
