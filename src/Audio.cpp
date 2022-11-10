@@ -11,10 +11,12 @@ extern "C" {
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 #include "BufferImpl.h"
+#include <vnxvideo/jget.h>
 
 #include "FFmpegUtils.h"
 
 using namespace std::placeholders;
+using json = nlohmann::json;
 
 const uint64_t ff_vorbis_channel_layouts[9] = {
     0x04,
@@ -27,7 +29,7 @@ const uint64_t ff_vorbis_channel_layouts[9] = {
 
 class CFFmpegAudioDecoder : public VnxVideo::IMediaDecoder {
 public:
-    CFFmpegAudioDecoder(EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata)
+    CFFmpegAudioDecoder(EMediaSubtype input, int channels, const json& extradata)
         : m_input(input)
         , m_onFrame([](...) {})
         , m_onFormat([](...) {})
@@ -38,7 +40,7 @@ public:
     {
         m_cc = createAvDecoderContext(codecIdFromSubtype(input),
             [&](AVCodecContext& cc) {
-            setDefaultParams(channels, m_input, cc);
+            setDefaultParams(channels, m_input, extradata, cc);
         });
     }
 
@@ -98,13 +100,17 @@ private:
             }
         }
     }
-    static void setDefaultParams(int channels, EMediaSubtype t, AVCodecContext& av) {
+    static void setDefaultParams(int channels, EMediaSubtype t, const json& extradata, AVCodecContext& av) {
         //const uint64_t layout = (1 << m_channels) - 1; // m_channels lowest bits set to 1
         const uint64_t layout = 0x8000000000000000ULL;  //AV_CH_LAYOUT_NATIVE
         switch (t) {
         case EMST_PCMU:
         case EMST_PCMA:
             av.sample_rate = 8000;
+            break;
+        case EMST_G726:
+            av.sample_rate = 8000;
+            av.bits_per_coded_sample = jget<int>(extradata,"bits_per_sample");
             break;
         case EMST_OPUS:
             av.sample_rate = 48000;
@@ -307,7 +313,7 @@ public:
     virtual void Process(VnxVideo::IBuffer* nalu, uint64_t timestamp) {
         m_decoder->Decode(nalu, timestamp);
     }
-    CFFmpegAudioTranscoder(EMediaSubtype output, EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata)
+    CFFmpegAudioTranscoder(EMediaSubtype output, EMediaSubtype input, int channels, const json& extradata)
         : m_encoder(new CFFmpegAudioEncoder(output))
         , m_decoder(new CFFmpegAudioDecoder(input, channels, extradata))
     {
@@ -326,7 +332,7 @@ private:
 
 namespace VnxVideo {
     VNXVIDEO_DECLSPEC ITranscoder* CreateAudioTranscoder(EMediaSubtype output, 
-        EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata) {
+        EMediaSubtype input, int channels, const json& extradata) {
         return new CFFmpegAudioTranscoder(output, input, channels, extradata);
     }
 
@@ -334,7 +340,7 @@ namespace VnxVideo {
         return new CFFmpegAudioEncoder(output);
     }
 
-    VNXVIDEO_DECLSPEC IMediaDecoder* CreateAudioDecoder(EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata) {
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateAudioDecoder(EMediaSubtype input, int channels, const json& extradata) {
         return new CFFmpegAudioDecoder(input, channels, extradata);
     }
 }

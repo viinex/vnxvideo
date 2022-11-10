@@ -63,6 +63,7 @@ extern "C" {
         EMST_OPUS = 64,
         EMST_AAC = 128,
         EMST_LPCM = 256,
+        EMST_G726 = 512,
     } EMediaSubtype;
 
     // a few supported media formats

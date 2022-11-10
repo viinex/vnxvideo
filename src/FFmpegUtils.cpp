@@ -11,7 +11,7 @@ AVCodecID codecIdFromSubtype(EMediaSubtype subtype) {
     case EMST_PCMA: return AV_CODEC_ID_PCM_ALAW;
     case EMST_OPUS: return AV_CODEC_ID_OPUS;
     case EMST_AAC: return AV_CODEC_ID_AAC;
-    //case EMST_LPCM: return AV_CODEC_ID_PCM_S16LE;
+    case EMST_G726: return AV_CODEC_ID_ADPCM_G726LE;
     }
     throw std::runtime_error("unhandled case in codecIdFromSubtype: "+std::to_string((int)subtype));
 }

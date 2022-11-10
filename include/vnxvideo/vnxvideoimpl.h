@@ -127,10 +127,10 @@ namespace VnxVideo
         virtual void Process(IBuffer* buf, uint64_t timestamp) = 0;
     };
     VNXVIDEO_DECLSPEC ITranscoder* CreateAudioTranscoder(EMediaSubtype output,
-        EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata);
+        EMediaSubtype input, int channels, const nlohmann::json& extradata);
 
     VNXVIDEO_DECLSPEC IMediaEncoder* CreateAudioEncoder(EMediaSubtype output);
-    VNXVIDEO_DECLSPEC IMediaDecoder* CreateAudioDecoder(EMediaSubtype input, int channels, const std::vector<uint8_t>& extradata);
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateAudioDecoder(EMediaSubtype input, int channels, const nlohmann::json& extradata);
 
     class IMediaSource {
     public:

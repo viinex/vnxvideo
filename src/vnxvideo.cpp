@@ -1121,11 +1121,13 @@ VNXVIDEO_DECLSPEC int vnxvideo_audio_transcoder_create(EMediaSubtype output,
     EMediaSubtype input, int channels, const uint8_t *extradata, int extradata_length,
     vnxvideo_transcoder_t* transcoder) {
     try {
-        std::vector<uint8_t> vextradata;
+        json jextradata;
         if (extradata && extradata_length) {
-            vextradata.insert(vextradata.end(), extradata, extradata + extradata_length);
+            std::string s(extradata, extradata + extradata_length);
+            std::stringstream ss(s);
+            ss >> jextradata;
         }
-        transcoder->ptr = VnxVideo::CreateAudioTranscoder(output, input, channels, vextradata);
+        transcoder->ptr = VnxVideo::CreateAudioTranscoder(output, input, channels, jextradata);
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
