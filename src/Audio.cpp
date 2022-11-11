@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <functional>
 
+#include <boost/algorithm/hex.hpp>
+
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/opt.h"
@@ -110,13 +112,19 @@ private:
             break;
         case EMST_G726:
             av.sample_rate = 8000;
-            av.bits_per_coded_sample = jget<int>(extradata,"bits_per_sample");
+            av.bits_per_coded_sample = jget<int>(extradata, "bits_per_sample");
             break;
         case EMST_OPUS:
             av.sample_rate = 48000;
             break;
         case EMST_AAC:
             av.sample_rate = 48000;
+            {
+                const std::string aaccfg(jget<std::string>(extradata, "config"));
+                av.extradata_size = aaccfg.size() / 2;
+                av.extradata = (uint8_t*)av_malloc(av.extradata_size);
+                boost::algorithm::unhex(aaccfg, av.extradata);
+            }
             break;
         default:
             return;
