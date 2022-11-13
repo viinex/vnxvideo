@@ -260,7 +260,7 @@ void CAvcodecRawSample::GetFormat(ERawMediaFormat &emf, int &x, int &y) {
     }
     else if (avfrmIsAudio(m_frame.get())) {
         emf = fromAVSampleFormat((AVSampleFormat)m_frame->format);
-        x = m_frame->sample_rate;
+        x = m_frame->nb_samples;
         y = m_frame->channels;
     }
 }

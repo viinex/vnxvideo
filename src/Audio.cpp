@@ -118,12 +118,16 @@ private:
             av.sample_rate = 48000;
             break;
         case EMST_AAC:
-            av.sample_rate = 48000;
+            av.sample_rate = 0;
+            av.channels = 0;
             {
                 const std::string aaccfg(jget<std::string>(extradata, "config"));
                 av.extradata_size = aaccfg.size() / 2;
                 av.extradata = (uint8_t*)av_malloc(av.extradata_size);
                 boost::algorithm::unhex(aaccfg, av.extradata);
+
+                av.sample_rate = jget<int>(extradata, "sample_rate", 0);
+                av.channels = jget<int>(extradata, "channels", 0);
             }
             break;
         default:
@@ -194,60 +198,80 @@ public:
 
         m_channels = channels;
         m_sampleRate = sample_rate;
-        m_samplesPerFrame = sample_rate / kAUDIO_FRAMES_PER_SECOND;
+        m_samplesPerFrameOut = sample_rate / kAUDIO_FRAMES_PER_SECOND;
         m_format = toAVSampleFormat(emf);
-        m_bytesPerFrame = m_samplesPerFrame * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
-        m_ticksPerFrame = 1000 / kAUDIO_FRAMES_PER_SECOND;
-        m_buffer.reserve(m_bytesPerFrame);
+        m_bytesPerFrameOut = m_samplesPerFrameOut * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
+        m_ticksPerFrameOut = 1000 / kAUDIO_FRAMES_PER_SECOND;
+        m_buffer.reserve(m_bytesPerFrameOut);
 
-        m_frm->nb_samples = m_samplesPerFrame;
+        m_frm->nb_samples = m_samplesPerFrameOut;
         m_frm->channels = m_channels;
         m_frm->sample_rate = m_sampleRate;
         m_frm->format = m_format;
-        m_frm->linesize[0] = m_bytesPerFrame;
+        m_frm->linesize[0] = m_bytesPerFrameOut;
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
         ERawMediaFormat format;
-        int sampleRate, channels;
-        sample->GetFormat(format, sampleRate, channels);
+        int sampleCount, channels;
+        sample->GetFormat(format, sampleCount, channels);
         if (!vnxvideo_emf_is_audio(format))
             return;
         if (!m_cc)
             return;
+
+        static uint64_t prevts;
+        //VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "timestamp: " << timestamp << '\t' << timestamp - prevts;
+        prevts = timestamp;
+
 
         int strides[4] = { 0,0,0,0 };
         uint8_t* data[4] = { nullptr,nullptr,nullptr,nullptr };
         sample->GetData(strides, data);
 
         uint8_t* cur = data[0];
-        uint8_t* end = cur + strides[0];
+        int bytesPerSample = sampleCount * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
+        uint8_t* end = cur + bytesPerSample;
 
         // if there was a leftover -- fill it up to full frame size and process
         if (!m_buffer.empty()) {
-            int bytesMissing = m_bytesPerFrame - (int)m_buffer.size();
+            int bytesMissing = m_bytesPerFrameOut - (int)m_buffer.size();
             m_buffer.insert(m_buffer.end(), cur, std::min(end, cur + bytesMissing));
 
-            if (m_buffer.size() != m_bytesPerFrame)
+            if (m_buffer.size() != m_bytesPerFrameOut) {
                 return; // nothing to process yet, whole input saved as leftover
+            }
+            //VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "delta: " << m_bufferTimestamp - (timestamp - m_buffer.size() * m_ticksPerFrameOut / m_bytesPerFrameOut);
+            //VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "m_bufferTimestamp: " << m_bufferTimestamp << '\t' << timestamp - m_bufferTimestamp;
 
             m_frm->data[0] = &m_buffer[0];
             m_frm->pts = m_bufferTimestamp;
 
             cur += bytesMissing;
-            timestamp += bytesMissing * m_ticksPerFrame / m_bytesPerFrame;
+            uint64_t dt = bytesMissing * m_ticksPerFrameOut / m_bytesPerFrameOut;
+            timestamp += dt;
+            m_bufferTimestamp += m_ticksPerFrameOut;
+
 
             sendFrame(*m_frm.get());
 
             m_buffer.clear();
         }
 
+        if (abs((int64_t)m_bufferTimestamp - (int64_t)timestamp) < 100) { // allowed jitter
+            timestamp = m_bufferTimestamp;
+        }
+        else {
+            m_bufferTimestamp = timestamp;
+        }
+
         // process full audio frames w/o copying while possible
-        while (cur + m_bytesPerFrame <= end) {
+        while (cur + m_bytesPerFrameOut <= end) {
             m_frm->data[0] = cur;
             m_frm->pts = timestamp;
 
-            cur += m_bytesPerFrame;
-            timestamp += m_ticksPerFrame;
+            cur += m_bytesPerFrameOut;
+            timestamp += m_ticksPerFrameOut;
+            m_bufferTimestamp += m_ticksPerFrameOut;
 
             sendFrame(*m_frm.get());
         }
@@ -306,9 +330,9 @@ private:
     VnxVideo::TOnBufferCallback m_onBuffer;
 
     AVSampleFormat m_format;
-    int m_samplesPerFrame;
-    int m_bytesPerFrame;
-    uint64_t m_ticksPerFrame;
+    int m_samplesPerFrameOut;
+    int m_bytesPerFrameOut;
+    uint64_t m_ticksPerFrameOut;
     std::vector<uint8_t> m_buffer;
     uint64_t m_bufferTimestamp;
 };
