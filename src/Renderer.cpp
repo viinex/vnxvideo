@@ -114,6 +114,7 @@ public:
         , m_rendererImplMixinProxy(new CRendererImplMixinProxy(this))
         , m_allocator(allocator)
         , m_audioOnFormatCalled(false)
+        , m_audioSampleRate(0)
     {
 
     }
@@ -229,6 +230,7 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         if (input == m_audioChannel && vnxvideo_emf_is_audio(emf)) {
             m_audioOnFormatCalled = false;
+            m_audioSampleRate = x;
             m_audioResample.reset();
         }
     }
@@ -254,12 +256,12 @@ public:
             lock.unlock();
             if (callOnFormat)
                 //onFormat(emf, x, y);
-                onFormat(EMF_LPCM16, x, y);
+                onFormat(EMF_LPCM16, m_audioSampleRate, y);
             if (emf != EMF_LPCM16) {
                 int layout = y == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
                 m_audioResample.reset(swr_alloc_set_opts(nullptr,
-                    layout, AV_SAMPLE_FMT_S16, x, // todo: make this adjustable
-                    layout, toAVSampleFormat(emf), x, 0, nullptr),
+                    layout, AV_SAMPLE_FMT_S16, m_audioSampleRate, // todo: make this adjustable
+                    layout, toAVSampleFormat(emf), m_audioSampleRate, 0, nullptr),
                     [](SwrContext* p) { swr_free(&p); });
                 int res = swr_init(m_audioResample.get());
                 if (res < 0) {
@@ -613,6 +615,7 @@ private:
     int m_audioChannel;
     bool m_audioOnFormatCalled;
     std::shared_ptr<SwrContext> m_audioResample;
+    int m_audioSampleRate; // sample rate of current audio input and output
 
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
