@@ -258,7 +258,7 @@ public:
                 //onFormat(emf, x, y);
                 onFormat(EMF_LPCM16, m_audioSampleRate, y);
             if (emf != EMF_LPCM16) {
-                int layout = y == 1 ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
+                int layout = (y == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
                 m_audioResample.reset(swr_alloc_set_opts(nullptr,
                     layout, AV_SAMPLE_FMT_S16, m_audioSampleRate, // todo: make this adjustable
                     layout, toAVSampleFormat(emf), m_audioSampleRate, 0, nullptr),
@@ -291,13 +291,12 @@ public:
                 const int channels = y;
                 std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, m_allocator.get()));
                 resampled->GetData(rstrides, rplanes);
-                uint64_t rtimestamp=swr_next_pts(m_audioResample.get(), timestamp);
                 int res=swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
                 if (res < 0) {
                     VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_convert: " << res;
                 }
                 else
-                    onFrame(resampled.get(), rtimestamp);
+                    onFrame(resampled.get(), timestamp);
             }
         }
     }
