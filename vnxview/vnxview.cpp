@@ -28,6 +28,8 @@ int main(int argc, char** argv) {
         std::mutex mutex;
         std::condition_variable condition;
 
+        const bool debugPrint = false;
+
         disp.reset(VnxVideo::CreateDisplay(1600, 1200, ("Viinex :: " + origin).c_str(), [&]() {
             std::unique_lock<std::mutex> lock(mutex);
             stop = true;
@@ -35,10 +37,20 @@ int main(int argc, char** argv) {
         }));
         lsrc.reset(VnxVideo::CreateLocalVideoClient(origin.c_str()));
         lsrc->Subscribe(
-            [&](EColorspace csp, int width, int height) {
-            disp->SetFormat(csp, width, height);
+            [&](ERawMediaFormat emf, int x, int y) {
+            if (debugPrint) {
+                std::cout << "SetFormat: media format: " << emf << ", width|sample_rate: " << x << ", height|channels: " << y << std::endl;
+            }
+            disp->SetFormat(emf, x, y);
         },
             [&](VnxVideo::IRawSample* f, uint64_t ts) {
+            if (debugPrint) {
+                ERawMediaFormat emf;
+                int x;
+                int y;
+                f->GetFormat(emf, x, y);
+                std::cout << "Sample: media format: " << emf << ", width|nsamples: " << x << ", height|channels: " << y << std::endl;
+            }
             disp->Process(f, ts);
         });
 
