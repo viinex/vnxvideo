@@ -193,7 +193,7 @@ private:
     void doRun() {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_running) {
-            int res = av_seek_frame(m_ctx.get(), m_stream, m_ctx->streams[m_stream]->start_time, AVSEEK_FLAG_FRAME);
+            int res = av_seek_frame(m_ctx.get(), m_stream, m_ctx->streams[m_stream]->start_time, AVSEEK_FLAG_ANY);
             if (0 != res) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CMediaFileLiveSource::doRun() failed to seek to the very first frame:"
                     << averr2str(res);
