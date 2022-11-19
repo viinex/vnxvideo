@@ -8,12 +8,14 @@
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/opt.h"
+#include <libswresample/swresample.h>
 }
 
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 #include "BufferImpl.h"
 #include <vnxvideo/jget.h>
+#include "RawSample.h"
 
 #include "FFmpegUtils.h"
 
@@ -180,6 +182,23 @@ public:
             cc.sample_fmt = toAVSampleFormat(emf);
             if (m_output == EMST_OPUS) {
                 cc.bit_rate = 64000 * channels;
+                if (sample_rate >= 32000) { // 8000,16000 and 24000 are okay for opus but 32000 and 44100 aren't; last two are upsampled to 48000.
+                    cc.sample_rate = 48000;
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: target sample rate for opus set to " << cc.sample_rate;
+                }
+                if (emf == EMF_LPCMFP) {
+                    cc.sample_fmt = toAVSampleFormat(EMF_LPCMF);
+                    int layout = (channels == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
+                    m_resample.reset(swr_alloc_set_opts(nullptr,
+                        layout, AV_SAMPLE_FMT_FLT, cc.sample_rate,
+                        layout, toAVSampleFormat(emf), sample_rate, 0, nullptr),
+                        [](SwrContext* p) { swr_free(&p); });
+                    int res = swr_init(m_resample.get());
+                    if (res < 0) {
+                        VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CFFmpegAudioEncoder::SetFormat(): failed to swr_init: " << res;
+                        m_resample.reset();
+                    }
+                }
             }
             cc.channels = channels;
             cc.time_base = {1, 1000};
@@ -197,17 +216,24 @@ public:
         });
 
         m_channels = channels;
-        m_sampleRate = sample_rate;
-        m_samplesPerFrameOut = sample_rate / kAUDIO_FRAMES_PER_SECOND;
-        m_format = toAVSampleFormat(emf);
-        m_bytesPerFrameOut = m_samplesPerFrameOut * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
+        m_sampleRateIn = sample_rate;
+        m_sampleRateOut = m_cc->sample_rate;
+        m_samplesPerFrameOut = m_sampleRateOut / kAUDIO_FRAMES_PER_SECOND;
+        m_formatIn = toAVSampleFormat(emf);
+        if (m_output == EMST_OPUS && emf == EMF_LPCMFP) {
+            m_formatOut = toAVSampleFormat(EMF_LPCMF);
+        }
+        else
+            m_formatOut = m_formatIn;
+        m_bytesPerFrameOut = m_samplesPerFrameOut * channels * bitsPerSampleByAVSampleFormat(m_formatOut) / 8;
         m_ticksPerFrameOut = 1000 / kAUDIO_FRAMES_PER_SECOND;
         m_buffer.reserve(m_bytesPerFrameOut);
 
         m_frm->nb_samples = m_samplesPerFrameOut;
         m_frm->channels = m_channels;
-        m_frm->sample_rate = m_sampleRate;
-        m_frm->format = m_format;
+        m_frm->channel_layout = m_cc->channel_layout;
+        m_frm->sample_rate = m_sampleRateOut;
+        m_frm->format = m_formatOut;
         m_frm->linesize[0] = m_bytesPerFrameOut;
     }
     virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
@@ -228,8 +254,25 @@ public:
         uint8_t* data[4] = { nullptr,nullptr,nullptr,nullptr };
         sample->GetData(strides, data);
 
+        if(!m_resample)
+            encode(sampleCount, channels, strides, data, timestamp);
+        else {
+            int sampleCountOutMax = swr_get_out_samples(m_resample.get(), sampleCount);
+            std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCMF, sampleCountOutMax, channels));
+            int rstrides[4] = {};
+            uint8_t* rdata[4] = {};
+            resampled->GetData(rstrides, rdata);
+            int res = swr_convert(m_resample.get(), rdata, sampleCountOutMax, (const uint8_t**)data, sampleCount);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_convert: " << res;
+            }
+            else
+                encode(res, channels, rstrides, rdata, timestamp);
+        }
+    }
+    void encode(int sampleCount, int channels, int* strides, uint8_t** data, uint64_t timestamp){
         uint8_t* cur = data[0];
-        int bytesPerSample = sampleCount * channels * bitsPerSampleByAVSampleFormat(m_format) / 8;
+        int bytesPerSample = sampleCount * channels * bitsPerSampleByAVSampleFormat(m_formatOut) / 8;
         uint8_t* end = cur + bytesPerSample;
 
         // if there was a leftover -- fill it up to full frame size and process
@@ -323,13 +366,16 @@ private:
 private:
     const EMediaSubtype m_output;
     int m_channels;
-    int m_sampleRate;
+    int m_sampleRateIn;
+    int m_sampleRateOut;
+    std::shared_ptr<SwrContext> m_resample;
     std::shared_ptr<AVCodecContext> m_cc;
     std::shared_ptr<AVFrame> m_frm;
     std::shared_ptr<AVPacket> m_pkt;
     VnxVideo::TOnBufferCallback m_onBuffer;
 
-    AVSampleFormat m_format;
+    AVSampleFormat m_formatIn;
+    AVSampleFormat m_formatOut;
     int m_samplesPerFrameOut;
     int m_bytesPerFrameOut;
     uint64_t m_ticksPerFrameOut;
