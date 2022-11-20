@@ -69,7 +69,7 @@ struct SConnection { // connection to a local transport client:
 #else
     SConnection(boost::asio::io_service& ios)
         : pipe(ios)
-        , timestamp(0)
+        , lastSeenIndex(0)
         , read(0)
     {
     }
