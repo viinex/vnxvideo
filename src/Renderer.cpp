@@ -99,6 +99,18 @@ private:
     const int m_input;
 };
 
+struct SAudioFormat {
+    ERawMediaFormat format;
+    int sampleRate;
+    int channels;
+    SAudioFormat() : format(EMF_NONE), sampleRate(0), channels(0) {}
+    SAudioFormat(ERawMediaFormat f, int r, int c) : format(f), sampleRate(r), channels(c) {}
+    bool operator==(const SAudioFormat& o) {
+        return format == o.format && sampleRate == o.sampleRate && channels == o.channels;
+    }
+    bool operator!=(const SAudioFormat& o) { return !(*this == o); }
+};
+
 class CRenderer : public VnxVideo::IRenderer, public CRendererImplMixin {
 public:
     CRenderer(int refresh_rate, PShmAllocator allocator) 
@@ -113,8 +125,8 @@ public:
         , m_onFrame([](...) {})
         , m_rendererImplMixinProxy(new CRendererImplMixinProxy(this))
         , m_allocator(allocator)
+        , m_selectedAudioSource(-1)
         , m_audioOnFormatCalled(false)
-        , m_audioSampleRate(0)
     {
 
     }
@@ -170,12 +182,23 @@ public:
         if (sample_rate != 0 || channels != 0 || layout.size() > 1) {
             throw std::runtime_error("Renderer only supports reproducing of at most one audio input with unchanged sample rate and number of channels");
         }
-        m_audioOnFormatCalled = false;
+        std::unique_lock<std::mutex> lock(m_mutex);
+
         m_audioLayout = std::shared_ptr<VnxVideo::TAudioLayout>(new VnxVideo::TAudioLayout(layout));
-        if (layout.empty())
-            m_audioChannel = -1;
-        else
-            m_audioChannel = layout[0].input;
+        int audioSource = -1;
+        if (!layout.empty())
+            audioSource = layout[0].input;
+
+        if (audioSource != m_selectedAudioSource) {
+            m_selectedAudioSource = audioSource;
+            m_audioOnFormatCalled = false;
+            if (audioSource >= 0 && audioSource < m_audioFormats.size())
+                m_audioFormat = m_audioFormats[audioSource];
+            else
+                m_audioFormat = SAudioFormat();
+            m_audioResample.reset();
+            m_audioSamples.clear();
+        }
     }
     void SetBackground(uint8_t* backgroundColor, VnxVideo::IRawSample* backgroundImage) {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -223,15 +246,24 @@ public:
         std::unique_lock<std::mutex> lock(m_mutex);
         if (m_samples.size() < index+1)
             m_samples.resize(index+1);
+        if (m_audioFormats.size() < index + 1)
+            m_audioFormats.resize(index + 1);
         m_samples[index]={ VnxVideo::PRawSample(), 0 };
         return new CRendererInput(m_rendererImplMixinProxy, index, transform);
     }
     virtual void InputSetFormat(int input, ERawMediaFormat emf, int x, int y) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (input == m_audioChannel && vnxvideo_emf_is_audio(emf)) {
-            m_audioOnFormatCalled = false;
-            m_audioSampleRate = x;
-            m_audioResample.reset();
+        if (vnxvideo_emf_is_audio(emf)) {
+            auto format = SAudioFormat(emf, x, y);
+            m_audioFormats[input] = format;
+            if (input == m_selectedAudioSource) {
+                if (!m_audioOnFormatCalled || m_audioFormat != format) {
+                    m_audioOnFormatCalled = false;
+                    m_audioFormat = format;
+                    m_audioResample.reset();
+                    m_audioSamples.clear();
+                }
+            }
         }
     }
     virtual void InputSetSample(int input, VnxVideo::IRawSample* sample, uint64_t timestamp) {
@@ -248,56 +280,9 @@ public:
             m_dirty = true;
             m_cond.notify_all();
         }
-        else if (input == m_audioChannel) {
-            VnxVideo::TOnFrameCallback onFrame(m_onFrame);
-            VnxVideo::TOnFormatCallback onFormat(m_onFormat);
-            bool callOnFormat = !m_audioOnFormatCalled;
-            m_audioOnFormatCalled = true;
-            lock.unlock();
-            if (callOnFormat)
-                //onFormat(emf, x, y);
-                onFormat(EMF_LPCM16, m_audioSampleRate, y);
-            if (emf != EMF_LPCM16) {
-                int layout = (y == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
-                m_audioResample.reset(swr_alloc_set_opts(nullptr,
-                    layout, AV_SAMPLE_FMT_S16, m_audioSampleRate, // todo: make this adjustable
-                    layout, toAVSampleFormat(emf), m_audioSampleRate, 0, nullptr),
-                    [](SwrContext* p) { swr_free(&p); });
-                int res = swr_init(m_audioResample.get());
-                if (res < 0) {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_init: " << res;
-                    m_audioResample.reset();
-                }
-            }
-            if (!m_audioResample) {
-                if(m_allocator.get()==nullptr)
-                    onFrame(sample, timestamp);
-                else {
-                    int strides[4] = { 0,0,0,0 };
-                    uint8_t* planes[4] = { 0,0,0,0 };
-                    sample->GetData(strides, planes);
-                    const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(emf));
-                    const int channels = y;
-                    std::shared_ptr<VnxVideo::IRawSample> copy(new CRawSample(EMF_LPCM16, nsamples, channels, strides, planes, m_allocator.get()));
-                    onFrame(copy.get(), timestamp);
-                }
-            }
-            else {
-                int strides[4] = { 0,0,0,0 }, rstrides[4] = { 0,0,0,0 };
-                uint8_t* planes[4] = { 0,0,0,0 };
-                uint8_t* rplanes[4] = { 0,0,0,0 };
-                sample->GetData(strides, planes);
-                const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(emf));
-                const int channels = y;
-                std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, m_allocator.get()));
-                resampled->GetData(rstrides, rplanes);
-                int res=swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
-                if (res < 0) {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::InputSetSample(): failed to swr_convert: " << res;
-                }
-                else
-                    onFrame(resampled.get(), timestamp);
-            }
+        else if (vnxvideo_emf_is_audio(emf) && input == m_selectedAudioSource) {
+            m_audioSamples.push_back({ VnxVideo::PRawSample(sample->Dup()), timestamp });
+            m_cond.notify_all();
         }
     }
 
@@ -342,6 +327,9 @@ private:
         auto prev = std::chrono::high_resolution_clock::now();
         const auto period = std::chrono::microseconds(1000000 / m_refresh_rate);
         while (m_run) {
+            processAudio(lock);
+            if (!m_run)
+                break;
             while (m_run && !m_dirty && !m_formatDirty)
                 m_cond.wait(lock);
             if (!m_run)
@@ -372,20 +360,90 @@ private:
                 onFrame(res.first.get(), res.second);
             }
 
-
+            lock.lock();
+            if (!m_run)
+                break;
+            if (!m_audioSamples.empty())
+                continue;
 
             auto now = std::chrono::high_resolution_clock::now();
             if (now < prev + period) {
                 const auto left = period - (now - prev);
-                std::this_thread::sleep_for(left);
+                m_cond.wait_for(lock, left);
+                //std::this_thread::sleep_for(left);
                 now = std::chrono::high_resolution_clock::now();
             }
-
             prev=now;
-            lock.lock();
-
         }
     }
+
+    void processAudio(std::unique_lock<std::mutex> &lock) {
+        if (m_audioSamples.empty())
+            return;
+        std::vector<std::pair<VnxVideo::PRawSample, uint64_t> > samples;
+        samples.swap(m_audioSamples);
+
+        SAudioFormat format(m_audioFormat);
+        VnxVideo::TOnFrameCallback onFrame(m_onFrame);
+        VnxVideo::TOnFormatCallback onFormat(m_onFormat);
+        bool callOnFormat = !m_audioOnFormatCalled;
+        m_audioOnFormatCalled = true;
+
+        if (format.format != EMF_LPCM16 && m_audioResample.get() == nullptr) {
+            int layout = (format.channels == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
+            m_audioResample.reset(swr_alloc_set_opts(nullptr,
+                layout, AV_SAMPLE_FMT_S16, format.sampleRate, // todo: make this adjustable
+                layout, toAVSampleFormat(format.format), format.sampleRate, 0, nullptr),
+                [](SwrContext* p) { swr_free(&p); });
+            int res = swr_init(m_audioResample.get());
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_init: " << res;
+                m_audioResample.reset();
+            }
+        }
+        std::shared_ptr<SwrContext> resample(m_audioResample);
+
+        lock.unlock();
+        if (callOnFormat)
+            onFormat(EMF_LPCM16, format.sampleRate, format.channels);
+    
+        for(auto &p : samples) {
+            auto sample = p.first;
+            auto timestamp = p.second;
+
+            if (!resample) {
+                if (m_allocator.get() == nullptr)
+                    onFrame(sample.get(), timestamp);
+                else {
+                    int strides[4] = { 0,0,0,0 };
+                    uint8_t* planes[4] = { 0,0,0,0 };
+                    sample->GetData(strides, planes);
+                    const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(format.format));
+                    const int channels = format.channels;
+                    std::shared_ptr<VnxVideo::IRawSample> copy(new CRawSample(EMF_LPCM16, nsamples, channels, strides, planes, m_allocator.get()));
+                    onFrame(copy.get(), timestamp);
+                }
+            }
+            else {
+                int strides[4] = { 0,0,0,0 }, rstrides[4] = { 0,0,0,0 };
+                uint8_t* planes[4] = { 0,0,0,0 };
+                uint8_t* rplanes[4] = { 0,0,0,0 };
+                sample->GetData(strides, planes);
+                const int nsamples = strides[0] * 8 / bitsPerSampleByAVSampleFormat(toAVSampleFormat(format.format));
+                const int channels = format.channels;
+                std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, m_allocator.get()));
+                resampled->GetData(rstrides, rplanes);
+                int res = swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_convert: " << res;
+                }
+                else
+                    onFrame(resampled.get(), timestamp);
+            }
+        }
+        lock.lock();
+    }
+
 
     static void DrawRect_8u_C1(uint8_t* data, IppiSize size, int stride, IppiRect rect, uint8_t val) {
         uint8_t* b = data + rect.y*stride + rect.x;
@@ -608,13 +666,22 @@ private:
     VnxVideo::PRawSample m_nosignalImage;
     std::shared_ptr<VnxVideo::TLayout> m_layout;
     std::shared_ptr<TSwsContexts> m_swsContexts;
+    // that's one VIDEO sample per input
     std::vector<std::pair<VnxVideo::PRawSample, uint64_t> > m_samples;
 
+    // cached formats of audio streams from attached media sources;
+    // we need that when layout changes but we don't get a formatchange call from 
+    // the audio source that we need to switch to
+    std::vector<SAudioFormat> m_audioFormats; 
+    // that's the queue of audio samples to be processed; all coming from one 
+    // (currently selected) source.
+    std::vector<std::pair<VnxVideo::PRawSample, uint64_t> > m_audioSamples;
+
     std::shared_ptr<VnxVideo::TAudioLayout> m_audioLayout;
-    int m_audioChannel;
+    int m_selectedAudioSource;
     bool m_audioOnFormatCalled;
     std::shared_ptr<SwrContext> m_audioResample;
-    int m_audioSampleRate; // sample rate of current audio input and output
+    SAudioFormat m_audioFormat; // format of selected audio stream
 
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
