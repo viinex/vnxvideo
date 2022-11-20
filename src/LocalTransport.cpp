@@ -54,7 +54,7 @@ typedef boost::asio::local::stream_protocol::socket pipe_t;
 struct SConnection { // connection to a local transport client:
     pipe_t pipe; // communication pipe
     std::map<uint64_t, std::shared_ptr<VnxVideo::IRawSample> > samples; // samples held by that client
-    uint64_t timestamp; // timestamp of the last sample sent to the client
+    uint64_t lastSeenIndex; // index of the last sample sent to the client
     SRawSampleMsg out; // frames sent to the client
     uint64_t in[2]; // commands received from client: [0, _] -> request frame, [1, handle] -> free frame.
     int read;
@@ -62,7 +62,7 @@ struct SConnection { // connection to a local transport client:
 #ifdef _WIN32
     SConnection(boost::asio::io_service& ios, pipe_t::native_handle_type handle)
         : pipe(ios, handle)
-        , timestamp(0)
+        , lastSeenIndex(0)
         , read(0)
     {
     }
@@ -93,6 +93,7 @@ public:
         : m_address(address)
         , m_allocator(allocator) 
         , m_timestamp(0)
+        , m_currentIndex(0)
         , m_shutdown(false)
         , m_audioSampleRateShl4(0)
 #ifndef _WIN32
@@ -209,7 +210,7 @@ public:
     }
     void requestFrame(std::shared_ptr<SConnection> conn) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        if (m_sample.get() && (conn->timestamp < m_timestamp))
+        if (m_sample.get() && (conn->lastSeenIndex < m_currentIndex))
             sendCurrentFrame(conn); // under the lock!
         else
             m_starving.insert(conn);
@@ -219,7 +220,7 @@ public:
         conn->samples.erase(frameId);
     }
     void sendCurrentFrame(std::shared_ptr<SConnection> conn) { // under the lock!!!
-        conn->timestamp = m_timestamp;
+        conn->lastSeenIndex = m_currentIndex;
 
         SRawSampleMsg& m = conn->out;
         uint8_t* planes[4];
@@ -299,10 +300,11 @@ public:
     void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_sample.reset(sample->Dup());
+        ++m_currentIndex;
         m_timestamp = timestamp;
 
         for (auto c = m_starving.begin(); c != m_starving.end();) {
-            if ((*c)->timestamp < m_timestamp) {
+            if ((*c)->lastSeenIndex < m_currentIndex) {
                 sendCurrentFrame(*c);
                 c = m_starving.erase(c);
             }
@@ -325,6 +327,7 @@ private:
 
     std::shared_ptr<VnxVideo::IRawSample> m_sample;
     uint64_t m_timestamp;
+    uint64_t m_currentIndex; // number of current sample
     bool m_shutdown;
 
     int m_audioSampleRateShl4;
