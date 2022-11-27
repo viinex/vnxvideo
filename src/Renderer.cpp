@@ -182,6 +182,7 @@ public:
         if (sample_rate != 0 || channels != 0 || layout.size() > 1) {
             throw std::runtime_error("Renderer only supports reproducing of at most one audio input with unchanged sample rate and number of channels");
         }
+        VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::UpdateAudioLayout(): sample_rate=" << sample_rate << ", channels=" << channels;
         std::unique_lock<std::mutex> lock(m_mutex);
 
         m_audioLayout = std::shared_ptr<VnxVideo::TAudioLayout>(new VnxVideo::TAudioLayout(layout));
@@ -199,6 +200,7 @@ public:
             m_audioResample.reset();
             m_audioSamples.clear();
         }
+        m_cond.notify_all();
     }
     void SetBackground(uint8_t* backgroundColor, VnxVideo::IRawSample* backgroundImage) {
         std::unique_lock<std::mutex> lock(m_mutex);
@@ -327,13 +329,16 @@ private:
         auto prev = std::chrono::high_resolution_clock::now();
         const auto period = std::chrono::microseconds(1000000 / m_refresh_rate);
         while (m_run) {
+            if (!m_run)
+                break;
+            while (m_run && !m_dirty && !m_formatDirty && m_audioSamples.empty()) {
+                m_cond.wait_for(lock, std::chrono::milliseconds(1));
+            }
+            if (!m_run)
+                break;
             processAudio(lock);
-            if (!m_run)
-                break;
-            while (m_run && !m_dirty && !m_formatDirty)
-                m_cond.wait(lock);
-            if (!m_run)
-                break;
+            if (!m_dirty && !m_formatDirty)
+                continue;
             sanitizeTimestamps();
             auto samples = m_samples;
             int width = m_width;
@@ -437,8 +442,10 @@ private:
                 if (res < 0) {
                     VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_convert: " << res;
                 }
-                else
+                else {
                     onFrame(resampled.get(), timestamp);
+                    //VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): converted, ts=" << timestamp;
+                }
             }
         }
         lock.lock();
