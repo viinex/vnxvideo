@@ -433,7 +433,7 @@ private:
                 const int channels = format.channels;
                 std::shared_ptr<VnxVideo::IRawSample> resampled(new CRawSample(EMF_LPCM16, nsamples, channels, m_allocator.get()));
                 resampled->GetData(rstrides, rplanes);
-                int res = swr_convert(m_audioResample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
+                int res = swr_convert(resample.get(), rplanes, nsamples, (const uint8_t**)planes, nsamples);
                 if (res < 0) {
                     VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_convert: " << res;
                 }
