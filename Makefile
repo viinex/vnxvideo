@@ -1,9 +1,9 @@
 TARGET = libvnxvideo.so
 
 SOURCES = $(wildcard src/*.cpp)
-HEADERS = $(wildcard src/*.h) $(widcard include/vnxvideo/*.h)
 
 OBJECTS = $(SOURCES:.cpp=.o)
+DEPS = $(OBJECTS:.o=.d)
 
 ifdef DEBUG
 CXXFLAGS = -O0 -g -DDEBUG
@@ -20,7 +20,7 @@ else
 	IPPLIBS = -l:libippcc.a -l:libippcv.a -l:libippi.a -l:libipps.a -l:libippcore.a
 endif
 
-CXXFLAGS += -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
+CXXFLAGS += -MMD -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
 
 LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib/intel64 -L$(IPP_HOME)/lib/intel64_lin
 
@@ -30,4 +30,6 @@ $(TARGET): $(OBJECTS)
 	c++ -shared $(LDFLAGS) -Wl,-Bsymbolic -z defs -o $(TARGET) $(OBJECTS) $(LDLIBS)
 
 clean:
-	rm -f $(OBJECTS) $(TARGET)
+	rm -f $(OBJECTS) $(DEPS) $(TARGET)
+
+-include $(DEPS)
