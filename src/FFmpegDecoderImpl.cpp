@@ -21,6 +21,7 @@ public:
     {
         m_cc=createAvDecoderContext(codecID,
             [=](AVCodecContext& cc) {
+            cc.thread_count = 1;
             cc.pkt_timebase = { 1,1000 };
             cc.time_base = { 1,1000 };
 
