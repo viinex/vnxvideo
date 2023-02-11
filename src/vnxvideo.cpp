@@ -595,15 +595,16 @@ int vnxvideo_raw_sample_from_bmp(const uint8_t* data, int size, vnxvideo_raw_sam
 
 int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder) {
     try {
-#ifdef _WIN32
         const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
         if (hwDecoderEnv != 0 && strncmp(hwDecoderEnv, "1", 1) == 0)
             decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
-        else
-            decoder->ptr = VnxVideo::CreateVideoDecoder_OpenH264();
-#else
-        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
-#endif
+        else {
+            const char* const swDecoderEnv = getenv("VNX_SW_DECODER");
+            if (swDecoderEnv != 0 && strcmp(swDecoderEnv, "ffmpeg") == 0)
+                decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
+            else
+                decoder->ptr = VnxVideo::CreateVideoDecoder_OpenH264();
+        }
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
