@@ -286,6 +286,14 @@ std::mutex g_codecImplementationsMutex;
 
 void enumHwDevices() {
     g_codecImplementations.clear();
+
+    const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
+    const char* const hwEncoderEnv = getenv("VNX_HW_ENCODER");
+    // don't even attempt to probe for hw accelerated codecs
+    // if both of the above variables are set to 0.
+    if (hwDecoderEnv != 0 && hwEncoderEnv != 0 && strncmp(hwDecoderEnv, "0", 1) == 0 && strncmp(hwEncoderEnv, "0", 1) == 0)
+        return;
+
 #if defined(_WIN64) || defined(__linux__)
     for (AVHWDeviceType t = av_hwdevice_iterate_types(AV_HWDEVICE_TYPE_NONE);
         t != AV_HWDEVICE_TYPE_NONE;
