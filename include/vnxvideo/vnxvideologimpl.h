@@ -33,5 +33,5 @@ namespace NVnxVideoLogImpl {
     }
 }
 
-#define VNXVIDEO_LOG(level, subsystem) ((level)>NVnxVideoLogImpl::g_maxLogLevel) ? (*(std::ostream*)nullptr) : NVnxVideoLogImpl::log_ostream((level), (subsystem))
+#define VNXVIDEO_LOG(level, subsystem) ((level)>NVnxVideoLogImpl::g_maxLogLevel) ? static_cast<std::stringstream &&>(*(std::ostream*)nullptr) : static_cast<std::stringstream &&>(NVnxVideoLogImpl::log_ostream((level), (subsystem)))
 
