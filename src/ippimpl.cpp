@@ -60,6 +60,7 @@ int vnxippiResize_8u_P2P3R(const uint8_t* const* pSrc, VnxIppiSize srcSize, cons
 
 #if defined(__aarch64__)
 
+#define __STDCALL
 #define IppApi extern "C" IppStatus __STDCALL
 
 IppApi ippStaticInit(void) {

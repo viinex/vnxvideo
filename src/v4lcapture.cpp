@@ -14,7 +14,9 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#if !defined(__APPLE__)
 #include <linux/videodev2.h>
+#endif
 
 #include <glob.h>
 
@@ -31,6 +33,15 @@ using json = nlohmann::json;
 
 #include "RawSample.h"
 
+#if defined(__APPLE__)
+namespace VnxVideo
+{
+    IVideoDeviceManager *CreateVideoDeviceManager_V4L()
+    {
+        return nullptr;
+    }
+}
+#else
 namespace
 {
     int xioctl(int fh, int request, void *arg)
@@ -589,3 +600,4 @@ namespace VnxVideo
         return new CVideoDeviceManager();
     }
 }
+#endif
