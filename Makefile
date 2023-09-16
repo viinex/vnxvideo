@@ -9,7 +9,7 @@ ifdef DEBUG
 CXXFLAGS = -O0 -g -DDEBUG
 LDFLAGS += -g
 else
-CXXFLAGS = -O2 -std=c++20
+CXXFLAGS = -O2
 endif
 
 ARCH = $(shell uname -m)
