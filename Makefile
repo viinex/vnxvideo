@@ -23,7 +23,7 @@ endif
 
 CXXFLAGS += -MMD -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
 
-LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib -L$(IPP_HOME)/lib
+LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib -L$(IPP_HOME)/lib/intel64_lin
 
 ifeq ($(UNAME_OS), Darwin)
 LDLIBS = -lopenh264 -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread -lz -ldl -lswresample -lboost_system
