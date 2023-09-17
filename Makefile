@@ -18,7 +18,7 @@ UNAME_OS = $(shell uname)
 ifeq ($(ARCH),aarch64)
 IPPLIBS =
 else
-IPPLIBS = -lippcc -lippcv -lippi -lipps -lippcore
+IPPLIBS = -l:libippcc.a -l:libippcv.a -l:libippi.a -l:libipps.a -l:libippcore.a
 endif
 
 CXXFLAGS += -MMD -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_HOME)/include -I$(OPENH264_HOME)/include -DVNXVIDEO_EXPORTS -fPIC
@@ -31,7 +31,7 @@ LDLIBS = -lopenh264 -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread
 $(TARGET): $(OBJECTS)
 	c++ -shared $(LDFLAGS) -o $(TARGET) $(OBJECTS) $(LDLIBS)
 else
-LDLIBS = -lopenh264 -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread -lz -ldl -lrt -lswresample -lboost_system
+LDLIBS = -l:libopenh264.a -lavcodec -lavutil -lavformat -lswscale $(IPPLIBS) -lpthread -lz -ldl -lrt -lswresample -lboost_system
 
 $(TARGET): $(OBJECTS)
 	c++ -shared $(LDFLAGS) -Wl,-Bsymbolic -z defs -o $(TARGET) $(OBJECTS) $(LDLIBS)
