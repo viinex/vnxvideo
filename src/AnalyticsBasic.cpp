@@ -100,9 +100,8 @@ protected:
     virtual void process(uint8_t* data, int width, int stride, int height, uint64_t timestamp) {
         //auto b = ippGetCpuClocks();
         
-        // here we assume timestamp is in 90kHz or 100 kHz units
-        //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "timestamp diff: " << timestamp - m_timestamp;
-        if (m_frameNumber != 0 && (skip_rate > 0) && timestamp - m_status.timestamp < 1000000 * (1 << skip_rate)) {
+        //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "timestamp diff: " << timestamp - m_status.timestamp;
+        if (m_frameNumber != 0 && (skip_rate > 0) && (timestamp - m_status.timestamp) < 40 * (1 << skip_rate)) {
             // uncomment to show result (on each frame)
             //ippiCopy_8u_C1R(m_motionLabel.get(), m_stride, data + width / 2 + height*stride / 2, stride, { m_width, m_height });
             return;
@@ -140,7 +139,7 @@ protected:
             j["too_blurry"] = m_status.alarmTooBlurry;
 
         if ((m_status.alertsMask() != m_lastSentStatus.alertsMask()) ||
-            ((m_status.alertsMask() != 0) && (m_status.timestamp - m_lastSentStatus.timestamp >= 10000000))) {
+            ((m_status.alertsMask() != 0) && (m_status.timestamp - m_lastSentStatus.timestamp) >= 1000)) {
             sendJson(j, m_status.timestamp);
             m_lastSentStatus = m_status;
         }
@@ -348,11 +347,11 @@ private:
             }
         }
         if (m_status.motionMask > 0) {
+            //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Motion detector active, mask=" << m_status.motionMask;
             if (motionCellsActive < 2 * motionCellsH*motionCellsV / 3) {
                 if(detect_motion)
                     m_status.alarmMotion = true;
                 m_status.alarmGlobalChange = false;
-                //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Motion detector active, mask=" << m_motionMask;
             }
             else {
                 if(detect_motion)
