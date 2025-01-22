@@ -91,6 +91,7 @@ namespace VnxVideo
         ECI_CUDA = 2, 
         ECI_VAAPI = 4,
         ECI_D3D11VA = 8,
+        ECI_RKMPP = 16,
     };
 
     VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegH264();

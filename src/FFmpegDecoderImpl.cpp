@@ -51,6 +51,10 @@ public:
                 hwDevType = AV_HWDEVICE_TYPE_QSV;
                 hwPixFmt = AV_PIX_FMT_QSV;
             }
+            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_RKMPP) {
+                hwDevType = AV_HWDEVICE_TYPE_RKMPP;
+                hwPixFmt = AV_PIX_FMT_DRM_PRIME;
+            }
 
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
                 int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
