@@ -55,7 +55,7 @@ public:
                 hwDevType = AV_HWDEVICE_TYPE_RKMPP;
                 hwPixFmt = AV_PIX_FMT_DRM_PRIME;
             }
-
+	    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
                 int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
                 if (res != 0) {
@@ -63,11 +63,13 @@ public:
                     throw VnxVideo::XHWDeviceNotSupported();
                 }
                 else {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded, hwDevType=" << hwDevType;
                     cc.hw_device_ctx = hw;
                     m_hwPixFmt = hwPixFmt;
-
+		    /*
                     if (codecID == AV_CODEC_ID_H264)
                         cc.flags2 &= ~AV_CODEC_FLAG2_CHUNKS;
+		    */
                 }
             }
 #endif
@@ -177,7 +179,7 @@ private:
 
 namespace VnxVideo {
     // Defines the priority for hardware decoders. Must end with ECI_CPU
-    ECodecImpl decoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
+    ECodecImpl decoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_RKMPP, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
 
     VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
         try {
