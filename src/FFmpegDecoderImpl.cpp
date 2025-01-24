@@ -11,6 +11,7 @@ extern "C" {
 
 #include "FFmpegUtils.h"
 
+
 class CVideoDecoder : public VnxVideo::IMediaDecoder {
 public:
     CVideoDecoder(AVCodecID codecID, VnxVideo::ECodecImpl eci)
@@ -38,22 +39,28 @@ public:
             else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_D3D11VA) {
                 hwDevType = AV_HWDEVICE_TYPE_D3D11VA;
                 hwPixFmt = AV_PIX_FMT_D3D11;
+                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_D3D11>;
             }
             else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
                 hwDevType = AV_HWDEVICE_TYPE_VAAPI;
                 hwPixFmt = AV_PIX_FMT_VAAPI;
+                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_VAAPI>;
             }
             else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_CUDA) {
                 hwDevType = AV_HWDEVICE_TYPE_CUDA;
                 hwPixFmt = AV_PIX_FMT_CUDA;
+                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_CUDA>;
+
             }
             else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_QSV) {
                 hwDevType = AV_HWDEVICE_TYPE_QSV;
                 hwPixFmt = AV_PIX_FMT_QSV;
+                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_QSV>;
             }
             else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_RKMPP) {
                 hwDevType = AV_HWDEVICE_TYPE_RKMPP;
                 hwPixFmt = AV_PIX_FMT_DRM_PRIME;
+                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_DRM_PRIME>;
             }
 	    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
@@ -175,6 +182,17 @@ private:
     VnxVideo::TOnFrameCallback m_onFrame;
     EColorspace m_csp;
     int m_width, m_height;
+private:
+    template<AVPixelFormat acceptableFormat>
+    static AVPixelFormat get_format(AVCodecContext *s, const enum AVPixelFormat *pix_fmts) {
+        while (*pix_fmts != AV_PIX_FMT_NONE) {
+            if (*pix_fmts == acceptableFormat) {
+                return acceptableFormat;
+            }
+            pix_fmts++;
+        }
+        return AV_PIX_FMT_NONE;
+    }
 };
 
 namespace VnxVideo {
