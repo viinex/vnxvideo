@@ -73,29 +73,37 @@ public:
                     VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded, hwDevType=" << hwDevType;
                     cc.hw_device_ctx = hw;
                     m_hwPixFmt = hwPixFmt;
-		    /*
-                    if (codecID == AV_CODEC_ID_H264)
-                        cc.flags2 &= ~AV_CODEC_FLAG2_CHUNKS;
-		    */
                 }
             }
 #endif
         });
+        m_parser.reset(av_parser_init(codecID), av_parser_close);
     }
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
         m_onFormat = onFormat;
         m_onFrame = onFrame;
     }
     virtual void Decode(VnxVideo::IBuffer* nalu, uint64_t timestamp) {
-        AVPacket p;
-        memset(&p, 0, sizeof p);
-        nalu->GetData(p.data, p.size);
-        p.pts = timestamp;
-        int res = avcodec_send_packet(m_cc.get(), &p);
-        if (0 != res)
-            VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
-        else
-            fetchDecoded();
+        uint8_t* data=nullptr;
+        int size=0;
+        nalu->GetData(data, size);
+        while (size > 0) {
+            AVPacket p;
+            memset(&p, 0, sizeof p);
+            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+            if (0 != res) {
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_parser_parse2 failed: " << res << ": " << fferr2str(res);
+                break;
+            }
+            p.pts = timestamp;
+            size -= p.size;
+            data += p.size;
+            res = avcodec_send_packet(m_cc.get(), &p);
+            if (0 != res)
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
+            else
+                fetchDecoded();
+        }
     }
     virtual void Flush() {
         AVPacket p;
@@ -178,6 +186,7 @@ private:
     const VnxVideo::ECodecImpl m_codecImpl;
     AVPixelFormat m_hwPixFmt;
     std::shared_ptr<AVCodecContext> m_cc;
+    std::shared_ptr<AVCodecParserContext> m_parser;
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
     EColorspace m_csp;
