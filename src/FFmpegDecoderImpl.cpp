@@ -62,7 +62,7 @@ public:
                 hwPixFmt = AV_PIX_FMT_DRM_PRIME;
                 cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_DRM_PRIME>;
             }
-	    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
                 int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
                 if (res != 0) {
@@ -70,7 +70,7 @@ public:
                     throw VnxVideo::XHWDeviceNotSupported();
                 }
                 else {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded, hwDevType=" << hwDevType;
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded";
                     cc.hw_device_ctx = hw;
                     m_hwPixFmt = hwPixFmt;
                 }
@@ -90,17 +90,27 @@ public:
         while (size > 0) {
             AVPacket p;
             memset(&p, 0, sizeof p);
-            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
-            if (0 != res) {
+            int res = av_parser_parse2(m_parser.get(), m_cc.get(),
+                                       &p.data, &p.size,
+                                       data, size,
+                                       timestamp, timestamp, -1);
+            if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_parser_parse2 failed: " << res << ": " << fferr2str(res);
                 break;
             }
-            p.pts = timestamp;
-            size -= p.size;
-            data += p.size;
+            size -= res;
+            data += res;
+
+            if(!p.size) {
+                continue; // ignore empty output packet, -- parser still makes advance
+            }
+            p.pts = m_parser->pts;
+            p.dts = m_parser->dts;
             res = avcodec_send_packet(m_cc.get(), &p);
-            if (0 != res)
+            if (res < 0){
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
+                avcodec_flush_buffers(m_cc.get());
+            }
             else
                 fetchDecoded();
         }
