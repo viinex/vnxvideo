@@ -19,9 +19,13 @@ std::string fferr2str(int errnum);
 
 void vnxvideo_init_ffmpeg(ELogLevel level);
 
+typedef enum AVPixelFormat(*FAVCCGetPixelFormat)(struct AVCodecContext *s, const enum AVPixelFormat * fmt);
+
+std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl);
+
 std::shared_ptr<AVCodecContext> createAvDecoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup = [](...) {});
-std::shared_ptr<AVCodecContext> createAvDecoderContext(const char* name, std::function<void(AVCodecContext&)> setup = [](...) {});
-std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup = [](...) {});
+//std::shared_ptr<AVCodecContext> createAvDecoderContext(const char* name, std::function<void(AVCodecContext&)> setup = [](...) {});
+std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, AVHWDeviceType hwDeviceType, std::function<void(AVCodecContext&)> setup = [](...) {});
 std::shared_ptr<AVCodecContext> createAvEncoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup);
 std::shared_ptr<AVCodecContext> createAvEncoderContext(const char* name, std::function<void(AVCodecContext&)> setup);
 std::shared_ptr<AVCodecContext> createAvEncoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup);

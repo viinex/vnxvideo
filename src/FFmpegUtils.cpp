@@ -56,21 +56,70 @@ std::string fferr2str(int errnum) {
     return res;
 }
 
-std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, std::function<void(AVCodecContext&)> setup) {
-    const AVCodec* codec = avcodec_find_decoder(codecId);
+void forall_av_codecs(std::function<void(const AVCodec*)> f) {
+    void* it = nullptr;
+    const AVCodec* c;
+    while ((c = av_codec_iterate(&it))) {
+        f(c);
+    }
+}
+
+const AVCodec* findCodec(AVCodecID codecID, AVHWDeviceType hwDeviceType, bool encoder) {
+    // as per fftools/ffmpeg_demux.c fn choose_decoder
+    const AVCodec* res = nullptr;
+    forall_av_codecs([=, &res](const AVCodec* c) {
+        if (c->id == codecID) {
+            if ((encoder && av_codec_is_encoder(c)) || av_codec_is_decoder(c)) {
+                const AVCodecHWConfig* hw_config;
+                for (int j = 0; hw_config = avcodec_get_hw_config(c, j); ++j) {
+                    if (hw_config->device_type == hwDeviceType) {
+                        res = c;
+                        return;
+                    }
+                }
+            }
+        }
+    });
+    return res;
+}
+
+std::shared_ptr<AVCodecContext> createAvDecoderContext(AVCodecID codecId, AVHWDeviceType hwDeviceType, std::function<void(AVCodecContext&)> setup) {
+    const AVCodec* codec = findCodec(codecId, hwDeviceType, false);
     if (!codec)
         throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder failed: " + std::to_string(codecId));
     return createAvDecoderContext(codec, setup);
 }
 
-std::shared_ptr<AVCodecContext> createAvDecoderContext(const char* name, std::function<void(AVCodecContext&)> setup) {
-    const AVCodec* codec = avcodec_find_decoder_by_name(name);
-    if (!codec)
-        throw std::runtime_error("createAvDecoderContext: avcodec_find_decoder_by_name failed: " + std::string(name));
-    return createAvDecoderContext(codec, setup);
+template<AVPixelFormat acceptableFormat>
+static AVPixelFormat make_get_format(AVCodecContext *s, const enum AVPixelFormat *pix_fmts) {
+    while (*pix_fmts != AV_PIX_FMT_NONE) {
+        if (*pix_fmts == acceptableFormat) {
+            return acceptableFormat;
+        }
+        pix_fmts++;
+    }
+    return AV_PIX_FMT_NONE;
+}
+
+std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl) {
+    switch (vnxHwCodecImpl) {
+    case VnxVideo::ECodecImpl::ECI_D3D11VA:
+        return std::make_tuple(AV_HWDEVICE_TYPE_D3D11VA, AV_PIX_FMT_D3D11, make_get_format<AV_PIX_FMT_D3D11>);
+    case VnxVideo::ECodecImpl::ECI_VAAPI:
+        return std::make_tuple(AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_VAAPI, make_get_format<AV_PIX_FMT_VAAPI>);
+    case VnxVideo::ECodecImpl::ECI_CUDA:
+        return std::make_tuple(AV_HWDEVICE_TYPE_CUDA, AV_PIX_FMT_CUDA, make_get_format<AV_PIX_FMT_CUDA>);
+    case VnxVideo::ECodecImpl::ECI_QSV:
+        return std::make_tuple(AV_HWDEVICE_TYPE_QSV, AV_PIX_FMT_QSV, make_get_format<AV_PIX_FMT_QSV>);
+    case VnxVideo::ECodecImpl::ECI_RKMPP:
+        return std::make_tuple(AV_HWDEVICE_TYPE_RKMPP, AV_PIX_FMT_DRM_PRIME, make_get_format<AV_PIX_FMT_DRM_PRIME>);
+    default:
+        return std::make_tuple(AV_HWDEVICE_TYPE_NONE, AV_PIX_FMT_NONE, nullptr);
+    }
 }
 
 std::shared_ptr<AVCodecContext> createAvDecoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup){
+
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
 
     res->flags |= AV_CODEC_FLAG_LOW_DELAY;
@@ -293,7 +342,6 @@ void enumHwDevices() {
     // if both of the above variables are set to 0.
     if (hwDecoderEnv != 0 && hwEncoderEnv != 0 && strncmp(hwDecoderEnv, "0", 1) == 0 && strncmp(hwEncoderEnv, "0", 1) == 0)
         return;
-
 #if defined(_WIN64) || defined(__linux__)
     for (AVHWDeviceType t = av_hwdevice_iterate_types(AV_HWDEVICE_TYPE_NONE);
         t != AV_HWDEVICE_TYPE_NONE;

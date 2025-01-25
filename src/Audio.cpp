@@ -42,7 +42,7 @@ public:
         , m_sample_rate(0)
         , m_channels(0)
     {
-        m_cc = createAvDecoderContext(codecIdFromSubtype(input),
+        m_cc = createAvDecoderContext(codecIdFromSubtype(input), AV_HWDEVICE_TYPE_NONE,
             [&](AVCodecContext& cc) {
             setDefaultParams(channels, m_input, extradata, cc);
         });

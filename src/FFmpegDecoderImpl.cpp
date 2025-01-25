@@ -20,7 +20,16 @@ public:
         , m_height(0)
         , m_codecImpl(eci)
     {
-        m_cc=createAvDecoderContext(codecID,
+        AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
+        AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
+        FAVCCGetPixelFormat get_format = nullptr;
+
+        const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
+        if (hwDecoderEnv == 0 || strncmp(hwDecoderEnv, "0", 1) != 0) {
+            std::tie(hwDevType, hwPixFmt, get_format) = fromHwDeviceType(eci);
+        }
+
+        m_cc=createAvDecoderContext(codecID, hwDevType,
             [=](AVCodecContext& cc) {
             cc.thread_count = 1;
             cc.pkt_timebase = { 1,1000 };
@@ -28,41 +37,7 @@ public:
 
 #if defined(_WIN64) || defined(__linux__)
             AVBufferRef* hw = nullptr;
-            AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
-            AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
-
-            const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
-            if (hwDecoderEnv != 0 && strncmp(hwDecoderEnv, "0", 1) == 0 ) {
-                hwDevType = AV_HWDEVICE_TYPE_NONE;
-                hwPixFmt = AV_PIX_FMT_NONE;
-            }
-            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_D3D11VA) {
-                hwDevType = AV_HWDEVICE_TYPE_D3D11VA;
-                hwPixFmt = AV_PIX_FMT_D3D11;
-                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_D3D11>;
-            }
-            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
-                hwDevType = AV_HWDEVICE_TYPE_VAAPI;
-                hwPixFmt = AV_PIX_FMT_VAAPI;
-                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_VAAPI>;
-            }
-            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_CUDA) {
-                hwDevType = AV_HWDEVICE_TYPE_CUDA;
-                hwPixFmt = AV_PIX_FMT_CUDA;
-                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_CUDA>;
-
-            }
-            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_QSV) {
-                hwDevType = AV_HWDEVICE_TYPE_QSV;
-                hwPixFmt = AV_PIX_FMT_QSV;
-                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_QSV>;
-            }
-            else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_RKMPP) {
-                hwDevType = AV_HWDEVICE_TYPE_RKMPP;
-                hwPixFmt = AV_PIX_FMT_DRM_PRIME;
-                cc.get_format = CVideoDecoder::get_format<AV_PIX_FMT_DRM_PRIME>;
-            }
-            VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
+    	    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
                 int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
                 if (res != 0) {
@@ -70,9 +45,10 @@ public:
                     throw VnxVideo::XHWDeviceNotSupported();
                 }
                 else {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded";
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded, hwDevType=" << hwDevType;
                     cc.hw_device_ctx = hw;
                     m_hwPixFmt = hwPixFmt;
+                    cc.get_format = get_format;
                 }
             }
 #endif
@@ -90,27 +66,21 @@ public:
         while (size > 0) {
             AVPacket p;
             memset(&p, 0, sizeof p);
-            int res = av_parser_parse2(m_parser.get(), m_cc.get(),
-                                       &p.data, &p.size,
-                                       data, size,
-                                       timestamp, timestamp, -1);
-            if (res < 0) {
+            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+            if (0 != res) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_parser_parse2 failed: " << res << ": " << fferr2str(res);
                 break;
             }
-            size -= res;
-            data += res;
-
-            if(!p.size) {
-                continue; // ignore empty output packet, -- parser still makes advance
-            }
-            p.pts = m_parser->pts;
-            p.dts = m_parser->dts;
+            p.pts = timestamp;
+            size -= p.size;
+            data += p.size;
             res = avcodec_send_packet(m_cc.get(), &p);
-            if (res < 0){
-                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
+            if (res == AVERROR_EOF) {
                 avcodec_flush_buffers(m_cc.get());
+                continue;
             }
+            if (0 != res)
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
             else
                 fetchDecoded();
         }
@@ -201,17 +171,6 @@ private:
     VnxVideo::TOnFrameCallback m_onFrame;
     EColorspace m_csp;
     int m_width, m_height;
-private:
-    template<AVPixelFormat acceptableFormat>
-    static AVPixelFormat get_format(AVCodecContext *s, const enum AVPixelFormat *pix_fmts) {
-        while (*pix_fmts != AV_PIX_FMT_NONE) {
-            if (*pix_fmts == acceptableFormat) {
-                return acceptableFormat;
-            }
-            pix_fmts++;
-        }
-        return AV_PIX_FMT_NONE;
-    }
 };
 
 namespace VnxVideo {
