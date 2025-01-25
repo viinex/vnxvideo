@@ -48,7 +48,8 @@ public:
                     VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create succeeded, hwDevType=" << hwDevType;
                     cc.hw_device_ctx = hw;
                     m_hwPixFmt = hwPixFmt;
-                    cc.get_format = get_format;
+                    if(get_format)
+                        cc.get_format = get_format;
                 }
             }
 #endif
@@ -66,14 +67,17 @@ public:
         while (size > 0) {
             AVPacket p;
             memset(&p, 0, sizeof p);
-            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
-            if (0 != res) {
+            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, timestamp, timestamp, 0);
+            if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_parser_parse2 failed: " << res << ": " << fferr2str(res);
                 break;
             }
-            p.pts = timestamp;
-            size -= p.size;
-            data += p.size;
+            size -= res;
+            data += res;
+            if (p.size == 0)
+                continue; // ignore empty packet, -- progress is made by parser
+            p.pts = m_parser->pts;
+            p.dts = m_parser->dts;
             res = avcodec_send_packet(m_cc.get(), &p);
             if (res == AVERROR_EOF) {
                 avcodec_flush_buffers(m_cc.get());
@@ -175,7 +179,13 @@ private:
 
 namespace VnxVideo {
     // Defines the priority for hardware decoders. Must end with ECI_CPU
-    ECodecImpl decoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_RKMPP, ECodecImpl::ECI_D3D11VA, ECodecImpl::ECI_QSV, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_CPU };
+    ECodecImpl decoderImplPrioTable[] = { 
+        ECodecImpl::ECI_CUDA, 
+        ECodecImpl::ECI_RKMPP, 
+        ECodecImpl::ECI_D3D11VA, 
+        ECodecImpl::ECI_QSV, 
+        ECodecImpl::ECI_VAAPI, 
+        ECodecImpl::ECI_CPU };
 
     VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
         try {

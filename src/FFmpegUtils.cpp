@@ -56,11 +56,12 @@ std::string fferr2str(int errnum) {
     return res;
 }
 
-void forall_av_codecs(std::function<void(const AVCodec*)> f) {
+void forall_av_codecs(std::function<bool(const AVCodec*)> f) {
     void* it = nullptr;
     const AVCodec* c;
     while ((c = av_codec_iterate(&it))) {
-        f(c);
+        if (f(c))
+            break;
     }
 }
 
@@ -74,11 +75,12 @@ const AVCodec* findCodec(AVCodecID codecID, AVHWDeviceType hwDeviceType, bool en
                 for (int j = 0; hw_config = avcodec_get_hw_config(c, j); ++j) {
                     if (hw_config->device_type == hwDeviceType) {
                         res = c;
-                        return;
+                        return true;
                     }
                 }
             }
         }
+        return false;
     });
     return res;
 }
@@ -104,7 +106,7 @@ static AVPixelFormat make_get_format(AVCodecContext *s, const enum AVPixelFormat
 std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl) {
     switch (vnxHwCodecImpl) {
     case VnxVideo::ECodecImpl::ECI_D3D11VA:
-        return std::make_tuple(AV_HWDEVICE_TYPE_D3D11VA, AV_PIX_FMT_D3D11, make_get_format<AV_PIX_FMT_D3D11>);
+        return std::make_tuple(AV_HWDEVICE_TYPE_D3D11VA, AV_PIX_FMT_D3D11, nullptr);
     case VnxVideo::ECodecImpl::ECI_VAAPI:
         return std::make_tuple(AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_VAAPI, make_get_format<AV_PIX_FMT_VAAPI>);
     case VnxVideo::ECodecImpl::ECI_CUDA:
