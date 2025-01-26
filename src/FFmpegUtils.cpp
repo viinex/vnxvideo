@@ -105,8 +105,8 @@ static AVPixelFormat make_get_format(AVCodecContext *s, const enum AVPixelFormat
 
 std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl) {
     switch (vnxHwCodecImpl) {
-    case VnxVideo::ECodecImpl::ECI_D3D11VA:
-        return std::make_tuple(AV_HWDEVICE_TYPE_D3D11VA, AV_PIX_FMT_D3D11, nullptr);
+    case VnxVideo::ECodecImpl::ECI_D3D12VA:
+        return std::make_tuple(AV_HWDEVICE_TYPE_D3D12VA, AV_PIX_FMT_D3D12, nullptr);
     case VnxVideo::ECodecImpl::ECI_VAAPI:
         return std::make_tuple(AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_VAAPI, make_get_format<AV_PIX_FMT_VAAPI>);
     case VnxVideo::ECodecImpl::ECI_CUDA:
@@ -297,7 +297,7 @@ bool avfrmIsVideo(AVFrame* frm) {
     return frm->width > 0 && frm->height > 0 && (AVPixelFormat)frm->format != AV_PIX_FMT_NONE;
 }
 bool avfrmIsAudio(AVFrame* frm) {
-    return frm->channels > 0 && frm->sample_rate > 0 && (AVSampleFormat)frm->format != AV_SAMPLE_FMT_NONE;
+    return frm->ch_layout.nb_channels > 0 && frm->sample_rate > 0 && (AVSampleFormat)frm->format != AV_SAMPLE_FMT_NONE;
 }
 
 VnxVideo::IRawSample* CAvcodecRawSample::Dup() {
@@ -312,7 +312,7 @@ void CAvcodecRawSample::GetFormat(ERawMediaFormat &emf, int &x, int &y) {
     else if (avfrmIsAudio(m_frame.get())) {
         emf = fromAVSampleFormat((AVSampleFormat)m_frame->format);
         x = m_frame->nb_samples;
-        y = m_frame->channels;
+        y = m_frame->ch_layout.nb_channels;
     }
 }
 void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
@@ -321,7 +321,7 @@ void CAvcodecRawSample::GetData(int* strides, uint8_t** planes) {
         nplanes = nplanesByAVPixelFormat((AVPixelFormat)m_frame->format);
     else if (avfrmIsAudio(m_frame.get())) {
         if (isPlanarAudioFormat((AVSampleFormat)m_frame->format))
-            nplanes = m_frame->channels;
+            nplanes = m_frame->ch_layout.nb_channels;
         else
             nplanes = 1;
     }
@@ -360,7 +360,7 @@ void enumHwDevices() {
         else if (t == AV_HWDEVICE_TYPE_CUDA)
             eci=VnxVideo::ECodecImpl::ECI_CUDA;
         else if (t == AV_HWDEVICE_TYPE_D3D11VA)
-            eci=VnxVideo::ECodecImpl::ECI_D3D11VA;
+            eci=VnxVideo::ECodecImpl::ECI_D3D12VA;
         else if (t == AV_HWDEVICE_TYPE_VAAPI)
             eci=VnxVideo::ECodecImpl::ECI_VAAPI;
         else if (t == AV_HWDEVICE_TYPE_RKMPP)

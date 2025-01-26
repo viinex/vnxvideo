@@ -201,7 +201,7 @@ private:
         m_cc = createAvEncoderContext(encoderName,
             [=](AVCodecContext& cc) {
             cc.time_base = { 1, 1000 };
-            cc.pix_fmt = hwPixFmt; // AV_PIX_FMT_D3D11; // AV_PIX_FMT_NV12; // AV_PIX_FMT_YUV420P;
+            cc.pix_fmt = hwPixFmt;
             cc.width = m_width;
             cc.height = m_height;
             cc.framerate = { 25, 1 };

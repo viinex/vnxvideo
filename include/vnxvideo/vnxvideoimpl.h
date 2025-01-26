@@ -90,7 +90,7 @@ namespace VnxVideo
         ECI_QSV = 1, 
         ECI_CUDA = 2, 
         ECI_VAAPI = 4,
-        ECI_D3D11VA = 8,
+        ECI_D3D12VA = 8,
         ECI_RKMPP = 16,
     };
 

@@ -182,7 +182,7 @@ namespace VnxVideo {
     ECodecImpl decoderImplPrioTable[] = { 
         ECodecImpl::ECI_CUDA, 
         ECodecImpl::ECI_RKMPP, 
-        ECodecImpl::ECI_D3D11VA, 
+        ECodecImpl::ECI_D3D12VA, 
         ECodecImpl::ECI_QSV, 
         ECodecImpl::ECI_VAAPI, 
         ECodecImpl::ECI_CPU };

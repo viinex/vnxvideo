@@ -8,6 +8,7 @@
 extern "C" {
 #include "libavcodec/avcodec.h"
 #include "libavutil/opt.h"
+#include "libavutil/channel_layout.h"
 #include <libswresample/swresample.h>
 }
 
@@ -22,13 +23,20 @@ extern "C" {
 using namespace std::placeholders;
 using json = nlohmann::json;
 
-const uint64_t ff_vorbis_channel_layouts[9] = {
-    0x04,
-    0x03,
-    0x07,
-    0x33,
-    0x37,
-    0x3f,
+const AVChannelLayout ff_vorbis_ch_layouts[9] = {
+    AV_CHANNEL_LAYOUT_MONO,
+    AV_CHANNEL_LAYOUT_STEREO,
+    AV_CHANNEL_LAYOUT_SURROUND,
+    AV_CHANNEL_LAYOUT_QUAD,
+    AV_CHANNEL_LAYOUT_5POINT0_BACK,
+    AV_CHANNEL_LAYOUT_5POINT1_BACK,
+    {
+        AV_CHANNEL_ORDER_NATIVE, 7,
+        { AV_CH_LAYOUT_5POINT1 | AV_CH_BACK_CENTER },
+        nullptr
+    },
+    AV_CHANNEL_LAYOUT_7POINT1,
+    { AV_CHANNEL_ORDER_UNSPEC, 0, {0}, nullptr }
 };
 
 class CFFmpegAudioDecoder : public VnxVideo::IMediaDecoder {
@@ -93,11 +101,11 @@ private:
             }
             else {
                 //VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "fetch decoded audio: fmt: " << m_frm->format << " nbsamples: " << m_frm->nb_samples << " channels: " << m_frm->channels;
-                if (m_sample_rate != m_frm->sample_rate || m_channels != m_frm->channels) {
-                    m_onFormat(fromAVSampleFormat((AVSampleFormat)m_frm->format), m_frm->sample_rate, m_frm->channels);
+                if (m_sample_rate != m_frm->sample_rate || m_channels != m_frm->ch_layout.nb_channels) {
+                    m_onFormat(fromAVSampleFormat((AVSampleFormat)m_frm->format), m_frm->sample_rate, m_frm->ch_layout.nb_channels);
 
                     m_sample_rate = m_frm->sample_rate;
-                    m_channels = m_frm->channels;
+                    m_channels = m_frm->ch_layout.nb_channels;
                 }
                 CAvcodecRawSample sample(m_frm.get());
                 m_onFrame(&sample, m_frm->pts);
@@ -105,8 +113,6 @@ private:
         }
     }
     static void setDefaultParams(int channels, EMediaSubtype t, const json& extradata, AVCodecContext& av) {
-        //const uint64_t layout = (1 << m_channels) - 1; // m_channels lowest bits set to 1
-        const uint64_t layout = 0x8000000000000000ULL;  //AV_CH_LAYOUT_NATIVE
         switch (t) {
         case EMST_PCMU:
         case EMST_PCMA:
@@ -121,7 +127,7 @@ private:
             break;
         case EMST_AAC:
             av.sample_rate = 0;
-            av.channels = 0;
+            av.ch_layout.nb_channels = 0;
             {
                 const std::string aaccfg(jget<std::string>(extradata, "config"));
                 av.extradata_size = aaccfg.size() / 2;
@@ -129,16 +135,18 @@ private:
                 boost::algorithm::unhex(aaccfg, av.extradata);
 
                 av.sample_rate = jget<int>(extradata, "sample_rate", 0);
-                av.channels = jget<int>(extradata, "channels", 0);
+                av.ch_layout.nb_channels = jget<int>(extradata, "channels", 0);
             }
             break;
         default:
             return;
         }
         if (channels) {
-            av.channels = channels;
+            av.ch_layout.nb_channels = channels;
         }
-        av.channel_layout = layout;
+        av.ch_layout.order = AV_CHANNEL_ORDER_NATIVE;
+        av.ch_layout.opaque = nullptr;
+        av.ch_layout.u.mask = av.ch_layout.nb_channels > 1 ? AV_CH_LAYOUT_STEREO : AV_CH_LAYOUT_MONO;
     }
 
 private:
@@ -176,6 +184,8 @@ public:
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: about to create audio encoder, output=" 
             << m_output
             << ", input emf=" << emf << ", sample_rate=" << sample_rate << ", channels=" << channels;
+        static AVChannelLayout layoutMono = { AV_CHANNEL_ORDER_NATIVE, 1,{ AV_CH_LAYOUT_MONO }, nullptr };
+        static AVChannelLayout layoutStereo = { AV_CHANNEL_ORDER_NATIVE, 2,{ AV_CH_LAYOUT_STEREO }, nullptr };
         m_cc = createAvEncoderContext(codecIdFromSubtype(m_output),
             [&](AVCodecContext& cc) {
             cc.sample_rate = sample_rate;
@@ -188,30 +198,32 @@ public:
                 }
                 if (emf == EMF_LPCMFP) {
                     cc.sample_fmt = toAVSampleFormat(EMF_LPCMF);
-                    int layout = (channels == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
-                    m_resample.reset(swr_alloc_set_opts(nullptr,
+                    const AVChannelLayout* layout = (channels == 1) ? &layoutMono : &layoutStereo;
+                    SwrContext* swrCtx = nullptr;
+                    int res = swr_alloc_set_opts2(&swrCtx,
                         layout, AV_SAMPLE_FMT_FLT, cc.sample_rate,
-                        layout, toAVSampleFormat(emf), sample_rate, 0, nullptr),
-                        [](SwrContext* p) { swr_free(&p); });
-                    int res = swr_init(m_resample.get());
+                        layout, toAVSampleFormat(emf), sample_rate, 0, nullptr);
+                    if (res < 0) {
+                        VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CFFmpegAudioEncoder::SetFormat(): failed to swr_alloc_set_opts2: " << res;
+                        return;
+                    }
+                    m_resample.reset(swrCtx, [](SwrContext* p) { swr_free(&p); });
+                    res = swr_init(m_resample.get());
                     if (res < 0) {
                         VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CFFmpegAudioEncoder::SetFormat(): failed to swr_init: " << res;
                         m_resample.reset();
                     }
                 }
             }
-            cc.channels = channels;
+            cc.ch_layout = (channels==1)?layoutMono:layoutStereo;
             cc.time_base = {1, 1000};
             if (m_output == EMST_OPUS) {
-                cc.channel_layout = ff_vorbis_channel_layouts[cc.channels - 1];
+                cc.ch_layout = ff_vorbis_ch_layouts[channels - 1];
                 int ret = av_opt_set_double(&cc, "frame_duration", 1000.0 / double(kAUDIO_FRAMES_PER_SECOND), AV_OPT_SEARCH_CHILDREN);
                 if (ret < 0) {
                     VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegAudioEncoder::SetFormat: Failed to set opus frame duration: "
                         << ret << ": " << fferr2str(ret);
                 }
-            }
-            else {
-                cc.channel_layout = 0x8000000000000000ULL; // m_ccInput->channel_layout;
             }
         });
 
@@ -230,8 +242,7 @@ public:
         m_buffer.reserve(m_bytesPerFrameOut);
 
         m_frm->nb_samples = m_samplesPerFrameOut;
-        m_frm->channels = m_channels;
-        m_frm->channel_layout = m_cc->channel_layout;
+        m_frm->ch_layout = m_cc->ch_layout;
         m_frm->sample_rate = m_sampleRateOut;
         m_frm->format = m_formatOut;
         m_frm->linesize[0] = m_bytesPerFrameOut;

@@ -394,13 +394,21 @@ private:
         bool callOnFormat = !m_audioOnFormatCalled;
         m_audioOnFormatCalled = true;
 
+        static AVChannelLayout layoutMono = { AV_CHANNEL_ORDER_NATIVE, 1, { AV_CH_LAYOUT_MONO }, nullptr };
+        static AVChannelLayout layoutStereo = { AV_CHANNEL_ORDER_NATIVE, 2, { AV_CH_LAYOUT_STEREO }, nullptr };
+
         if (format.format != EMF_LPCM16 && m_audioResample.get() == nullptr) {
-            int layout = (format.channels == 1) ? AV_CH_LAYOUT_MONO : AV_CH_LAYOUT_STEREO;
-            m_audioResample.reset(swr_alloc_set_opts(nullptr,
+            const AVChannelLayout* layout = (format.channels == 1) ? &layoutMono : &layoutStereo;
+            SwrContext* swrCtx = nullptr;
+            int res = swr_alloc_set_opts2(&swrCtx,
                 layout, AV_SAMPLE_FMT_S16, format.sampleRate, // todo: make this adjustable
-                layout, toAVSampleFormat(format.format), format.sampleRate, 0, nullptr),
-                [](SwrContext* p) { swr_free(&p); });
-            int res = swr_init(m_audioResample.get());
+                layout, toAVSampleFormat(format.format), format.sampleRate, 0, nullptr);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_alloc_set_opts2: " << res;
+                return;
+            }
+            m_audioResample.reset(swrCtx, [](SwrContext* p) { swr_free(&p); });
+            res = swr_init(m_audioResample.get());
             if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "renderer") << "CRenderer::processAudio(): failed to swr_init: " << res;
                 m_audioResample.reset();
