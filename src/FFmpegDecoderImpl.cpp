@@ -67,7 +67,7 @@ public:
         while (size > 0) {
             AVPacket p;
             memset(&p, 0, sizeof p);
-            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, timestamp, timestamp, 0);
+            int res = av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, data, size, timestamp, AV_NOPTS_VALUE, 0);
             if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_parser_parse2 failed: " << res << ": " << fferr2str(res);
                 break;
@@ -181,8 +181,10 @@ namespace VnxVideo {
     // Defines the priority for hardware decoders. Must end with ECI_CPU
     ECodecImpl decoderImplPrioTable[] = { 
         ECodecImpl::ECI_CUDA, 
+#if defined(HAS_FF_RKMPP)
         ECodecImpl::ECI_RKMPP, 
-        ECodecImpl::ECI_D3D12VA, 
+#endif
+        ECodecImpl::ECI_D3D12VA,
         ECodecImpl::ECI_QSV, 
         ECodecImpl::ECI_VAAPI, 
         ECodecImpl::ECI_CPU };

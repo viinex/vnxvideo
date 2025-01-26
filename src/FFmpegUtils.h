@@ -61,8 +61,3 @@ private:
 bool isCodecImplSupported(VnxVideo::ECodecImpl eci);
 
 void checkFramesContext(AVCodecContext& cc, int width, int height, AVPixelFormat hwpixfmt);
-
-#ifndef HAS_FF_RKMPP // stubs to compile with vanilla ffmpeg
-#define AV_HWDEVICE_TYPE_RKMPP ((AVHWDeviceType)(AV_HWDEVICE_TYPE_VULKAN+1))
-
-#endif
