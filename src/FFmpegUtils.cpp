@@ -372,7 +372,7 @@ void enumHwDevices() {
             eci=VnxVideo::ECodecImpl::ECI_QSV;
         else if (t == AV_HWDEVICE_TYPE_CUDA)
             eci=VnxVideo::ECodecImpl::ECI_CUDA;
-        else if (t == AV_HWDEVICE_TYPE_D3D11VA)
+        else if (t == AV_HWDEVICE_TYPE_D3D12VA)
             eci=VnxVideo::ECodecImpl::ECI_D3D12VA;
         else if (t == AV_HWDEVICE_TYPE_VAAPI)
             eci=VnxVideo::ECodecImpl::ECI_VAAPI;

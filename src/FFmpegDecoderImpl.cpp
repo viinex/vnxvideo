@@ -78,6 +78,7 @@ public:
                 continue; // ignore empty packet, -- progress is made by parser
             p.pts = m_parser->pts;
             p.dts = m_parser->dts;
+            p.pos = -1;
             res = avcodec_send_packet(m_cc.get(), &p);
             if (res == AVERROR_EOF) {
                 avcodec_flush_buffers(m_cc.get());
@@ -184,8 +185,8 @@ namespace VnxVideo {
 #if defined(HAS_FF_RKMPP)
         ECodecImpl::ECI_RKMPP, 
 #endif
+        ECodecImpl::ECI_QSV,
         ECodecImpl::ECI_D3D12VA,
-        ECodecImpl::ECI_QSV, 
         ECodecImpl::ECI_VAAPI, 
         ECodecImpl::ECI_CPU };
 
