@@ -93,10 +93,11 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;swresample-2.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AMBASE_HOME)\$(Configuration);$(IPP_HOME)\lib\ia32;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;avcodec-vnx.lib;avformat-vnx.lib;avutil-vnx.lib;swscale-vnx.lib;swresample-vnx.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AMBASE_HOME)\$(Configuration);$(IPP_HOME)\lib\ia32;$(FFMPEG_HOME)\bin;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
       <AdditionalOptions>/DEF:vnxvideo.def %(AdditionalOptions)</AdditionalOptions>
       <ModuleDefinitionFile>vnxvideo.def</ModuleDefinitionFile>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
     <PostBuildEvent />
     <PostBuildEvent>
@@ -137,10 +138,11 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;avcodec-57.lib;avformat-57.lib;avutil-55.lib;swscale-4.lib;swresample-2.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(AMBASE_HOME)\$(Configuration);$(IPP_HOME)\lib\ia32;$(FFMPEG_HOME)\lib;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>kernel32.lib;user32.lib;gdi32.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib;avcodec-vnx.lib;avformat-vnx.lib;avutil-vnx.lib;swscale-vnx.lib;swresample-vnx.lib;ippccmt.lib;ippcvmt.lib;ippimt.lib;ippsmt.lib;ippcoremt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(AMBASE_HOME)\$(Configuration);$(IPP_HOME)\lib\ia32;$(FFMPEG_HOME)\bin;$(OPENH264_HOME)\lib</AdditionalLibraryDirectories>
       <AdditionalOptions>/DEF:vnxvideo.def %(AdditionalOptions)</AdditionalOptions>
       <ModuleDefinitionFile>vnxvideo.def</ModuleDefinitionFile>
+      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
     </Link>
     <PostBuildEvent />
   </ItemDefinitionGroup>
