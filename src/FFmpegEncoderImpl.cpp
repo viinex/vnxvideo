@@ -191,7 +191,7 @@ private:
             hwDevType = AV_HWDEVICE_TYPE_CUDA;
             hwPixFmt = AV_PIX_FMT_CUDA;
         }
-#if defined(HAS_FF_RKMPP)
+#if defined(__aarch64__)
         else if (m_codecImpl == VnxVideo::ECodecImpl::ECI_RKMPP) {
             encoderName = "h264_rkmpp";
             hwDevType = AV_HWDEVICE_TYPE_RKMPP;

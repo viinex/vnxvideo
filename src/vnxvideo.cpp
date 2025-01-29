@@ -334,7 +334,7 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* en
             encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_CUDA);
             return vnxvideo_err_ok;
         }
-#if defined(HAS_FF_RKMPP)
+#if defined(__aarch64__)
         else if (type == "rkmpp") {
             encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_RKMPP);
             return vnxvideo_err_ok;

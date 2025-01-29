@@ -116,15 +116,17 @@ static AVPixelFormat make_get_format(AVCodecContext *s, const enum AVPixelFormat
 
 std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl) {
     switch (vnxHwCodecImpl) {
+#if !defined(__aarch64__)
     case VnxVideo::ECodecImpl::ECI_D3D12VA:
         return std::make_tuple(AV_HWDEVICE_TYPE_D3D12VA, AV_PIX_FMT_D3D12, make_get_format<AV_PIX_FMT_D3D12>);
+#endif
     case VnxVideo::ECodecImpl::ECI_VAAPI:
         return std::make_tuple(AV_HWDEVICE_TYPE_VAAPI, AV_PIX_FMT_VAAPI, make_get_format<AV_PIX_FMT_VAAPI>);
     case VnxVideo::ECodecImpl::ECI_CUDA:
         return std::make_tuple(AV_HWDEVICE_TYPE_CUDA, AV_PIX_FMT_CUDA, make_get_format<AV_PIX_FMT_CUDA>);
     case VnxVideo::ECodecImpl::ECI_QSV:
         return std::make_tuple(AV_HWDEVICE_TYPE_QSV, AV_PIX_FMT_QSV, make_get_format<AV_PIX_FMT_QSV>);
-#if defined(HAS_FF_RKMPP)
+#if defined(__aarch64__)
     case VnxVideo::ECodecImpl::ECI_RKMPP:
         return std::make_tuple(AV_HWDEVICE_TYPE_RKMPP, AV_PIX_FMT_DRM_PRIME, make_get_format<AV_PIX_FMT_DRM_PRIME>);
 #endif
@@ -372,11 +374,13 @@ void enumHwDevices() {
             eci=VnxVideo::ECodecImpl::ECI_QSV;
         else if (t == AV_HWDEVICE_TYPE_CUDA)
             eci=VnxVideo::ECodecImpl::ECI_CUDA;
+#if !defined(__aarch64__)
         else if (t == AV_HWDEVICE_TYPE_D3D12VA)
             eci=VnxVideo::ECodecImpl::ECI_D3D12VA;
+#endif
         else if (t == AV_HWDEVICE_TYPE_VAAPI)
             eci=VnxVideo::ECodecImpl::ECI_VAAPI;
-#if defined(HAS_FF_RKMPP)
+#if defined(__aarch64__)
         else if (t == AV_HWDEVICE_TYPE_RKMPP)
             eci = VnxVideo::ECodecImpl::ECI_RKMPP;
 #endif

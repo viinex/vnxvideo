@@ -182,7 +182,7 @@ namespace VnxVideo {
     // Defines the priority for hardware decoders. Must end with ECI_CPU
     ECodecImpl decoderImplPrioTable[] = { 
         ECodecImpl::ECI_CUDA, 
-#if defined(HAS_FF_RKMPP)
+#if defined(__aarch64__)
         ECodecImpl::ECI_RKMPP, 
 #endif
         ECodecImpl::ECI_QSV,
