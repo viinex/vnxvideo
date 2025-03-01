@@ -18,18 +18,26 @@ public:
         : m_csp(EMF_NONE)
         , m_width(0)
         , m_height(0)
+        , m_codecID(codecID)
         , m_codecImpl(eci)
     {
+        reInitialize();
+    }
+    void reInitialize(){
+        m_cc.reset();
+        m_parser.reset();
+        m_errorsInARow = 0;
+
         AVPixelFormat hwPixFmt = AV_PIX_FMT_NONE;
         AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
         FAVCCGetPixelFormat get_format = nullptr;
 
         const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
         if (hwDecoderEnv == 0 || strncmp(hwDecoderEnv, "0", 1) != 0) {
-            std::tie(hwDevType, hwPixFmt, get_format) = fromHwDeviceType(eci);
+            std::tie(hwDevType, hwPixFmt, get_format) = fromHwDeviceType(m_codecImpl);
         }
 
-        m_cc=createAvDecoderContext(codecID, hwDevType,
+        m_cc=createAvDecoderContext(m_codecID, hwDevType,
             [=](AVCodecContext& cc) {
             cc.thread_count = 1;
             cc.pkt_timebase = { 1,1000 };
@@ -54,13 +62,17 @@ public:
             }
 #endif
         });
-        m_parser.reset(av_parser_init(codecID), av_parser_close);
+        m_parser.reset(av_parser_init(m_codecID), av_parser_close);
     }
     virtual void Subscribe(VnxVideo::TOnFormatCallback onFormat, VnxVideo::TOnFrameCallback onFrame) {
         m_onFormat = onFormat;
         m_onFrame = onFrame;
     }
     virtual void Decode(VnxVideo::IBuffer* nalu, uint64_t timestamp) {
+        if (m_errorsInARow > 250) {
+            VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "Reached 250 errors in a row mark; will re-initialize the decoder";
+            reInitialize();
+        }
         uint8_t* data=nullptr;
         int size=0;
         nalu->GetData(data, size);
@@ -82,10 +94,13 @@ public:
             res = avcodec_send_packet(m_cc.get(), &p);
             if (res == AVERROR_EOF) {
                 avcodec_flush_buffers(m_cc.get());
+                ++m_errorsInARow;
                 continue;
             }
-            if (0 != res)
+            if (0 != res) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
+                ++m_errorsInARow;
+            }
             else
                 fetchDecoded();
         }
@@ -112,13 +127,16 @@ private:
             CAvcodecRawSample result;
             int res = avcodec_receive_frame(m_cc.get(), result.GetAVFrame());
             if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
+                ++m_errorsInARow;
                 return;
             }
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_receive_frame failed: "
                     << res << ": " << fferr2str(res);
+                ++m_errorsInARow;
                 return;
             }
+            m_errorsInARow = 0;
             callOnFormat(result.GetAVFrame());
             m_onFrame(&result, result.GetAVFrame()->pts); // pkt_pts said to be deprecated but it's the only valid value
         }
@@ -129,11 +147,13 @@ private:
             std::shared_ptr<AVFrame> hwfrm(avframeAlloc());
             int res = avcodec_receive_frame(m_cc.get(), hwfrm.get());
             if (res == AVERROR(EAGAIN) || res == AVERROR_EOF) {
+                ++m_errorsInARow;
                 return; // or sleep and continue?
             }
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_receive_frame failed: "
                     << res << ": " << fferr2str(res);
+                ++m_errorsInARow;
                 return;
             }
 
@@ -145,6 +165,7 @@ private:
                 if (res < 0) {
                     VNXVIDEO_LOG(VNXLOG_ERROR, "ffmpeg") << "av_hwframe_transfer_data failed: "
                         << res << ": " << fferr2str(res);
+                    ++m_errorsInARow;
                     continue;
                 }
                 dst->pts = hwfrm->pts;
@@ -155,6 +176,7 @@ private:
             callOnFormat(dst.get());
             CAvcodecRawSample result(dst);
             m_onFrame(&result, dst->pts);
+            m_errorsInARow = 0;
         }
 #endif
     }
@@ -168,6 +190,7 @@ private:
         }
     }
 private:
+    const AVCodecID m_codecID;
     const VnxVideo::ECodecImpl m_codecImpl;
     AVPixelFormat m_hwPixFmt;
     std::shared_ptr<AVCodecContext> m_cc;
@@ -176,6 +199,7 @@ private:
     VnxVideo::TOnFrameCallback m_onFrame;
     EColorspace m_csp;
     int m_width, m_height;
+    int m_errorsInARow;
 };
 
 namespace VnxVideo {
