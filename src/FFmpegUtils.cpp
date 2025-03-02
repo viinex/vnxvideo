@@ -71,6 +71,10 @@ const AVCodec* findCodec(AVCodecID codecID, AVHWDeviceType hwDeviceType, bool en
     forall_av_codecs([=, &res](const AVCodec* c) {
         if (c->id == codecID) {
             if ((encoder && av_codec_is_encoder(c)) || av_codec_is_decoder(c)) {
+                if (hwDeviceType == AV_HWDEVICE_TYPE_NONE) {
+                    res = c;
+                    return true;
+                }
                 const AVCodecHWConfig* hw_config;
                 for (int j = 0; hw_config = avcodec_get_hw_config(c, j); ++j) {
                     if (hw_config->device_type == hwDeviceType) {
