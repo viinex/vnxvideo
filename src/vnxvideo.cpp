@@ -310,6 +310,46 @@ int vnxvideo_rawproc_flush(vnxvideo_rawproc_t proc) {
     }
 }
 
+namespace {
+    class CRawProcFromCallbacks: public virtual VnxVideo::IRawProc {
+    public:
+        CRawProcFromCallbacks(vnxvideo_on_frame_format_t onFormat, void* usrptrOnFormat,
+            vnxvideo_on_raw_sample_t onSample, void* usrptrOnSample)
+            : m_onFormat(onFormat)
+            , m_usrptrOnFormat(usrptrOnFormat)
+            , m_onSample(onSample)
+            , m_usrptrOnSample(usrptrOnSample)
+        {
+        }
+        virtual void SetFormat(ERawMediaFormat csp, int width, int height) {
+            m_onFormat(m_usrptrOnFormat, csp, width, height);
+        }
+        virtual void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
+            m_onSample(m_usrptrOnSample, { sample }, timestamp);
+        }
+        virtual void Flush() {}
+    private:
+        vnxvideo_on_frame_format_t const m_onFormat;
+        void* const m_usrptrOnFormat;
+        vnxvideo_on_raw_sample_t const m_onSample;
+        void* const m_usrptrOnSample;
+    };
+}
+int vnxvideo_rawproc_create_from_callbacks(
+    vnxvideo_on_frame_format_t onFormat, void* usrptrOnFormat,
+    vnxvideo_on_raw_sample_t onSample, void* usrptrOnSample,
+    vnxvideo_rawproc_t* proc) {
+    try {
+        proc->ptr = static_cast<VnxVideo::IRawProc*>(new CRawProcFromCallbacks(onFormat, usrptrOnFormat, onSample, usrptrOnSample));
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_rawproc_create_from_callbacks: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
+
 int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* encoder) {
     try {
         json j;

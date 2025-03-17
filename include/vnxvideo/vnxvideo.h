@@ -165,6 +165,10 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_rawproc_process(vnxvideo_rawproc_t proc, vnxvideo_raw_sample_t sample, uint64_t timestamp);
     VNXVIDEO_DECLSPEC int vnxvideo_rawproc_flush(vnxvideo_rawproc_t proc);
 
+    VNXVIDEO_DECLSPEC int vnxvideo_rawproc_create_from_callbacks(
+        vnxvideo_on_frame_format_t onFormat, void* usrptrOnFormat,
+        vnxvideo_on_raw_sample_t onSample, void* usrptrOnSample,
+        vnxvideo_rawproc_t* proc);
 
     VNXVIDEO_DECLSPEC int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* encoder);
     VNXVIDEO_DECLSPEC int vnxvideo_audio_encoder_create(EMediaSubtype output, const char* json_config, 
