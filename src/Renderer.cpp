@@ -360,9 +360,15 @@ private:
                 onFormat(EMF_I420, width, height);
             }
             if (layout) {
-                std::pair<VnxVideo::PRawSample, uint64_t> res = doRender(width, height, backgroundColor, backgroundImage, nosignalImage,
-                    *layout.get(), *swsContexts.get(), m_allocator.get(), samples);
-                onFrame(res.first.get(), res.second);
+                try{
+                    std::pair<VnxVideo::PRawSample, uint64_t> res =
+                        doRender(width, height, backgroundColor, backgroundImage, nosignalImage,
+                                 *layout.get(), *swsContexts.get(), m_allocator.get(), samples);
+                    onFrame(res.first.get(), res.second);
+                }
+                catch(const std::exception& e) {
+                    VNXVIDEO_LOG(VNXLOG_WARNING, "renderer") << "CRenderer::doRender(): " << e.what();
+                }
             }
 
             lock.lock();
