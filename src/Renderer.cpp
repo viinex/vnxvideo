@@ -378,11 +378,13 @@ private:
                 continue;
 
             auto now = std::chrono::high_resolution_clock::now();
-            if (now < prev + period) {
+            while (now < prev + period) {
                 const auto left = period - (now - prev);
                 m_cond.wait_for(lock, left);
                 //std::this_thread::sleep_for(left);
                 now = std::chrono::high_resolution_clock::now();
+                if (!m_run || !m_audioSamples.empty())
+                    break;
             }
             prev=now;
         }
