@@ -120,7 +120,7 @@ static AVPixelFormat make_get_format(AVCodecContext *s, const enum AVPixelFormat
 
 std::tuple<enum AVHWDeviceType, AVPixelFormat, FAVCCGetPixelFormat> fromHwDeviceType(VnxVideo::ECodecImpl vnxHwCodecImpl) {
     switch (vnxHwCodecImpl) {
-#if !defined(__aarch64__)
+#if defined(_WIN32)
     case VnxVideo::ECodecImpl::ECI_D3D12VA:
         return std::make_tuple(AV_HWDEVICE_TYPE_D3D12VA, AV_PIX_FMT_D3D12, make_get_format<AV_PIX_FMT_D3D12>);
 #endif
@@ -378,7 +378,7 @@ void enumHwDevices() {
             eci=VnxVideo::ECodecImpl::ECI_QSV;
         else if (t == AV_HWDEVICE_TYPE_CUDA)
             eci=VnxVideo::ECodecImpl::ECI_CUDA;
-#if !defined(__aarch64__)
+#if defined(_WIN32)
         else if (t == AV_HWDEVICE_TYPE_D3D12VA)
             eci=VnxVideo::ECodecImpl::ECI_D3D12VA;
 #endif
