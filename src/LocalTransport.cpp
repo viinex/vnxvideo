@@ -56,8 +56,9 @@ struct SConnection { // connection to a local transport client:
     std::map<uint64_t, std::shared_ptr<VnxVideo::IRawSample> > samples; // samples held by that client
     uint64_t lastSeenIndex; // index of the last sample sent to the client
     SRawSampleMsg out; // frames sent to the client
+    size_t written;
     uint64_t in[2]; // commands received from client: [0, _] -> request frame, [1, handle] -> free frame.
-    int read;
+    size_t read;
 
 #ifdef _WIN32
     SConnection(boost::asio::io_service& ios, pipe_t::native_handle_type handle)
@@ -161,32 +162,35 @@ public:
         lock.unlock();
         listen(); // the connection is accepted, but we should start to listen for a new one
         if (!ec) {
-            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Accepted connection to local transport";
+            VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoProvider::acceptHandler: Accepted connection to local transport " << m_address;
             scheduleRead(conn);
         }
         else {
-            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "Listening for connection to local transport failed: " << ec;
+            VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "CLocalVideoProvider::acceptHandler: Listening for connection to local transport " 
+                << m_address << " failed: " << ec;
         }
     }
-    void scheduleRead(std::shared_ptr<SConnection> conn, bool cont=false) {
-        if(!cont)
-            conn->read = 0;
-        boost::asio::async_read(conn->pipe,
-            boost::asio::buffer((uint8_t*)(conn->in) + conn->read,
-                sizeof(conn->in) - conn->read),
-            boost::bind(&CLocalVideoProvider::readHandler, this, conn, _1, _2));
+    void scheduleRead(std::shared_ptr<SConnection> conn) {
+        conn->read = 0;
+        readHandler(conn, boost::system::error_code(), 0);
     }
     void readHandler(std::shared_ptr<SConnection> conn, const boost::system::error_code & ec, size_t n){
         if (ec){
             if (ec != boost::system::errc::operation_canceled) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "Error on reading from named pipe: " << ec;
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoProvider::readHandler: Error on reading from named pipe: " << ec;
                 dropConnection(conn);
             }
             // otherwise it's canceled and we do nothing
         }
         else {
-            conn->read += (int)n;
-            if (conn->read == sizeof(conn->in)) {
+            conn->read += n;
+            if (conn->read < sizeof(conn->in)) {
+                boost::asio::async_read(conn->pipe,
+                    boost::asio::buffer((uint8_t*)(conn->in) + conn->read,
+                        sizeof(conn->in) - conn->read),
+                    boost::bind(&CLocalVideoProvider::readHandler, this, conn, _1, _2));
+            }
+            else {
                 const uint64_t command = conn->in[0];
                 const uint64_t argument = conn->in[1];
                 if (command == CMD_REQUEST)
@@ -198,13 +202,9 @@ public:
                     requestFrame(conn);
                 }
                 else
-                    VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "Unknown command in local transport: " << conn->in[0];
-                conn->read = 0;
-                boost::asio::async_read(conn->pipe, boost::asio::buffer(conn->in, sizeof(conn->in)),
-                    boost::bind(&CLocalVideoProvider::readHandler, this, conn, _1, _2));
-            }
-            else {
-                scheduleRead(conn, true);
+                    VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoProvider::readHandler: Unknown command in local transport: " << conn->in[0];
+
+                scheduleRead(conn);
             }
         }
     }
@@ -239,8 +239,9 @@ public:
             m.pointer = pointer;
             conn->samples[pointer] = m_sample;
 
-            boost::asio::async_write(conn->pipe, boost::asio::buffer(&conn->out, sizeof(conn->out)),
-                boost::bind(&CLocalVideoProvider::writeHandler, this, conn, _1, _2));
+            conn->written = 0;
+            // kick off writing by calling handler as if 0 bytes were successfully written
+            writeHandler(conn, boost::system::error_code(), 0);
         }
         catch (const std::exception& x) {
             VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "CLocalVideoProvider::sendCurrentFrame: caught exception: " << x.what();
@@ -249,12 +250,20 @@ public:
     void writeHandler(std::shared_ptr<SConnection> conn, const boost::system::error_code & ec, size_t n) {
         if (ec){
             if (ec != boost::system::errc::operation_canceled) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "Error on writing to named pipe: " << ec;
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoProvider::writeHandler: Error on writing to named pipe: " << ec;
                 dropConnection(conn);
             }
             // otherwise it's canceled and we do nothing
         }
-        else if (n == sizeof(conn->out)) {
+        else {
+            conn->written += n;
+            if (conn->written < sizeof(conn->out)) {
+                boost::asio::async_write(conn->pipe,
+                    boost::asio::buffer(reinterpret_cast<uint8_t*>(&conn->out) + conn->written,
+                        sizeof(conn->out) - conn->written),
+                    boost::bind(&CLocalVideoProvider::writeHandler, this, conn, _1, _2));
+            }
+            // else write is complete for this frame
         }
     }
 
@@ -379,8 +388,12 @@ public:
         m_shared->mapping = m_mapping;
     }
   
-    void prepareCommandBuffer() {
+    // prepare command buffer and schedule sending it to the server.
+    // Command buffer is always not empty: free what has to be freed, and then 
+    // request a frame.
+    void scheduleWriteCommandBuffer() {
         m_commandBuffer.clear();
+        m_commandBufferBytesSent = 0;
         std::unique_lock<std::mutex> lock(m_shared->mutex);
         for (uint64_t ptr : m_shared->free) {
             m_commandBuffer.push_back(CMD_FREE);
@@ -389,6 +402,8 @@ public:
         m_shared->free.clear();
         m_commandBuffer.push_back(CMD_REQUEST);
         m_commandBuffer.push_back(0);
+
+        writeHandler(boost::system::error_code(), 0);
     }
 
     void connect() {
@@ -397,18 +412,29 @@ public:
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::connect: Pipe/socket opened";
         openShm();
         VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CLocalVideoClient::connect: Shared memory segment opened";
-        prepareCommandBuffer(); // it's always free what has to be freed, and then request
-        boost::asio::async_write(m_pipe, boost::asio::buffer(m_commandBuffer),
-            boost::bind(&CLocalVideoClient::writeHandler, this, _1, _2));
+        scheduleWriteCommandBuffer(); // it's always free what has to be freed, and then request
     }
     void writeHandler(const boost::system::error_code & ec, size_t n) {
         if (ec && ec != boost::system::errc::operation_canceled) {
             VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoClient::writeHandler: Error on writing to named pipe: " << ec;
             scheduleReconnect();
         }
-        else if (n == m_commandBuffer.size()*sizeof(uint64_t)) {
-            boost::asio::async_read(m_pipe, boost::asio::buffer(&m_sample, sizeof(m_sample)),
-                boost::bind(&CLocalVideoClient::readHandler, this, _1, _2));
+        else if (ec == boost::system::errc::success) {
+            m_commandBufferBytesSent += n;
+            if (m_commandBufferBytesSent < m_commandBuffer.size() * sizeof(uint64_t)) {
+                boost::asio::async_write(m_pipe,
+                    boost::asio::buffer(reinterpret_cast<uint8_t*>(&m_commandBuffer[0]) + m_commandBufferBytesSent, 
+                        m_commandBuffer.size() * sizeof(uint64_t) - m_commandBufferBytesSent),
+                    boost::bind(&CLocalVideoClient::writeHandler, this, _1, _2));
+            }
+            else {
+                m_sampleBytesRead = 0;
+                // kick off reading by calling the readHandler as if it has read 0 bytes
+                readHandler(boost::system::error_code(), 0);
+            }
+        }
+        else {
+            VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoClient::writeHandler: " << ec; // this must be operation canceled
         }
     }
     void readHandler(const boost::system::error_code & ec, size_t n) {
@@ -416,11 +442,21 @@ public:
             VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoClient::readHandler: Error on reading to named pipe: " << ec;
             scheduleReconnect();
         }
-        else if (n == sizeof(m_sample)) {
-            sendSample();
-            prepareCommandBuffer();
-            boost::asio::async_write(m_pipe, boost::asio::buffer(m_commandBuffer),
-                boost::bind(&CLocalVideoClient::writeHandler, this, _1, _2));
+        else if (ec == boost::system::errc::success) {
+            m_sampleBytesRead += n;
+            if (m_sampleBytesRead < sizeof(m_sample)) {
+                boost::asio::async_read(m_pipe,
+                    boost::asio::buffer(reinterpret_cast<uint8_t*>(&m_sample) + m_sampleBytesRead, 
+                        sizeof(m_sample) - m_sampleBytesRead),
+                    boost::bind(&CLocalVideoClient::readHandler, this, _1, _2));
+            }
+            else {
+                sendSample();
+                scheduleWriteCommandBuffer();
+            }
+        }
+        else {
+            VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CLocalVideoClient::readHandler: " << ec; // this must be operation canceled
         }
     }
 
@@ -524,8 +560,10 @@ private:
     std::shared_ptr<SFree> m_shared;
 
     SRawSampleMsg m_sample; // frame received from the server
+    size_t m_sampleBytesRead;
     // commands sent to the server: sequence of pairs: [0, _] -> request frame, [1, handle] -> free frame.
     std::vector<uint64_t> m_commandBuffer;
+    size_t m_commandBufferBytesSent;
 
     VnxVideo::TOnFormatCallback m_onFormat;
     VnxVideo::TOnFrameCallback m_onFrame;
