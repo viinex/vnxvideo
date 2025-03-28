@@ -240,6 +240,7 @@ private:
             res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
+		throw std::runtime_error("CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed");
             }
             else {
                 cc.hw_device_ctx = hw;

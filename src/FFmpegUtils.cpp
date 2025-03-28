@@ -146,6 +146,7 @@ std::shared_ptr<AVCodecContext> createAvDecoderContext(const AVCodec* codec, std
     res->flags |= AV_CODEC_FLAG_LOW_DELAY;
     res->flags2 |= AV_CODEC_FLAG2_CHUNKS;
     res->flags2 |= AV_CODEC_FLAG2_FAST;
+    res->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 
     setup(*res.get());
 
@@ -171,6 +172,8 @@ std::shared_ptr<AVCodecContext> createAvEncoderContext(const char* name, std::fu
 
 std::shared_ptr<AVCodecContext> createAvEncoderContext(const AVCodec* codec, std::function<void(AVCodecContext&)> setup) {
     std::shared_ptr<AVCodecContext> res(avcodec_alloc_context3(codec), [](AVCodecContext* cc) {avcodec_free_context(&cc); });
+
+    res->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 
     setup(*res.get());
 
