@@ -94,8 +94,8 @@ namespace VnxVideo
         ECI_RKMPP = 16,
     };
 
-    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegH264();
-    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegHEVC();
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegH264(bool cpuOnly);
+    VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_FFmpegHEVC(bool cpuOnly);
     VNXVIDEO_DECLSPEC IMediaDecoder* CreateVideoDecoder_OpenH264();
 
     class IRawProc {

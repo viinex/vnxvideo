@@ -643,11 +643,11 @@ int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder) {
     try {
         const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
         if (hwDecoderEnv != 0 && strncmp(hwDecoderEnv, "1", 1) == 0)
-            decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
+            decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264(false);
         else {
             const char* const swDecoderEnv = getenv("VNX_SW_DECODER");
             if (swDecoderEnv != 0 && strcmp(swDecoderEnv, "ffmpeg") == 0)
-                decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264();
+                decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264(true);
             else
                 decoder->ptr = VnxVideo::CreateVideoDecoder_OpenH264();
         }
@@ -658,9 +658,24 @@ int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder) {
         return vnxvideo_err_invalid_parameter;
     }
 }
+int vnxvideo_h264_sw_decoder_create(vnxvideo_decoder_t* decoder) {
+    try {
+        const char* const swDecoderEnv = getenv("VNX_SW_DECODER");
+        if (swDecoderEnv != 0 && strcmp(swDecoderEnv, "ffmpeg") == 0)
+            decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegH264(true);
+        else
+            decoder->ptr = VnxVideo::CreateVideoDecoder_OpenH264();
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_h264_sw_decoder_create: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
 int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder) {
     try {
-        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegHEVC();
+        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegHEVC(false);
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -668,6 +683,17 @@ int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder) {
         return vnxvideo_err_invalid_parameter;
     }
 }
+int vnxvideo_hevc_sw_decoder_create(vnxvideo_decoder_t* decoder) {
+    try {
+        decoder->ptr = VnxVideo::CreateVideoDecoder_FFmpegHEVC(true);
+        return vnxvideo_err_ok;
+    }
+    catch (const std::exception& e) {
+        VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Exception on vnxvideo_sw_hevc_decoder_create: " << e.what();
+        return vnxvideo_err_invalid_parameter;
+    }
+}
+
 void vnxvideo_decoder_free(vnxvideo_decoder_t decoder) {
     auto p = reinterpret_cast<VnxVideo::IMediaDecoder*>(decoder.ptr);
     delete p;

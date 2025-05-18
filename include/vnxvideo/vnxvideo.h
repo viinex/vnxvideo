@@ -207,6 +207,8 @@ extern "C" {
 
     VNXVIDEO_DECLSPEC int vnxvideo_h264_decoder_create(vnxvideo_decoder_t* decoder);
     VNXVIDEO_DECLSPEC int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder);
+    VNXVIDEO_DECLSPEC int vnxvideo_h264_sw_decoder_create(vnxvideo_decoder_t* decoder); // software
+    VNXVIDEO_DECLSPEC int vnxvideo_hevc_sw_decoder_create(vnxvideo_decoder_t* decoder); // software
     VNXVIDEO_DECLSPEC void vnxvideo_decoder_free(vnxvideo_decoder_t decoder);
     VNXVIDEO_DECLSPEC int vnxvideo_decoder_subscribe(vnxvideo_decoder_t decoder,
         vnxvideo_on_frame_format_t handle_format, void* usrptr_format,

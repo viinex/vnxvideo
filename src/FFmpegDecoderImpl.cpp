@@ -214,11 +214,13 @@ namespace VnxVideo {
         ECodecImpl::ECI_VAAPI, 
         ECodecImpl::ECI_CPU };
 
-    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid) {
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpeg(AVCodecID cid, bool cpuOnly) {
         try {
-            for (const VnxVideo::ECodecImpl* eci = decoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
-                if (isCodecImplSupported(*eci))
-                    return new CVideoDecoder(cid, *eci);
+            if (!cpuOnly) {
+                for (const VnxVideo::ECodecImpl* eci = decoderImplPrioTable; *eci != ECodecImpl::ECI_CPU; ++eci) {
+                    if (isCodecImplSupported(*eci))
+                        return new CVideoDecoder(cid, *eci);
+                }
             }
             return new CVideoDecoder(cid, ECodecImpl::ECI_CPU);
         }
@@ -227,10 +229,10 @@ namespace VnxVideo {
             return new CVideoDecoder(cid, ECodecImpl::ECI_CPU);
         }
     }
-    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegH264() {
-        return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_H264);
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegH264(bool cpuOnly) {
+        return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_H264, cpuOnly);
     }
-    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegHEVC() {
-        return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_HEVC);
+    VnxVideo::IMediaDecoder* CreateVideoDecoder_FFmpegHEVC(bool cpuOnly) {
+        return CreateVideoDecoder_FFmpeg(AV_CODEC_ID_HEVC, cpuOnly);
     }
 }
