@@ -119,6 +119,7 @@ public:
         , m_formatDirty(false)
         , m_width(0)
         , m_height(0)
+        , m_sizeless(false)
         , m_run(false)
         , m_backgroundColor({0,0,0})
         , m_onFormat([](...) {})
@@ -139,6 +140,23 @@ public:
         const VnxVideo::TLayout& layout) {
         if (width < 0 || height < 0 || width > 4096 || height > 4096)
             throw std::runtime_error("CRenderer::UpdateLayout(): invalid target image size requested");
+        if (width == 0 && height == 0) {
+            if (layout.size() != 1 
+                || layout[0].src_left != 0 
+                || layout[0].src_top != 0
+                || layout[0].src_right != 1
+                || layout[0].src_bottom != 1
+                || layout[0].dst_left != 0
+                || layout[0].dst_top != 0
+                || layout[0].dst_right != 1
+                || layout[0].dst_bottom != 1
+                )
+                throw std::runtime_error("CRenderer::UpdateLayout(): layout with width and height both equal to 0 can only be specified with exactly one viewport");
+            else
+                m_sizeless = true;
+        }
+        else
+            m_sizeless = false;
         std::unique_lock<std::mutex> lock(m_mutex);
         m_layout = std::shared_ptr<VnxVideo::TLayout>(new VnxVideo::TLayout(layout));
         m_swsContexts = std::shared_ptr<TSwsContexts>(new TSwsContexts(layout.size()));
@@ -339,7 +357,8 @@ private:
             processAudio(lock);
             if (!m_dirty && !m_formatDirty)
                 continue;
-            sanitizeTimestamps();
+            if(!m_sizeless)
+                sanitizeTimestamps();
             auto samples = m_samples;
             int width = m_width;
             int height = m_height;
@@ -353,7 +372,21 @@ private:
             auto checkFormat = m_formatDirty;
             m_dirty = false;
             m_formatDirty = false;
-            if (m_width == 0 || m_height == 0)
+
+            if (m_sizeless) { // the case when output size is defined by the frame size of the only viewport
+                if (layout->size() == 1 && layout->at(0).input >= 0 && samples.size() > layout->at(0).input && samples[layout->at(0).input].first.get() != nullptr) {
+                    ERawMediaFormat emf;
+                    samples[0].first->GetFormat(emf, width, height);
+                    if (width != m_width || height != m_height) {
+                        m_width = width;
+                        m_height = height;
+                        checkFormat = true;
+                    }
+                }
+                else
+                    continue;
+            }
+            else if (m_width == 0 || m_height == 0)
                 continue;
             lock.unlock();
             if (checkFormat) {
@@ -683,6 +716,7 @@ private:
 
     int m_width;
     int m_height;
+    bool m_sizeless; // the case of layout with width==0 and height==0 and the only viewport specified in the layout
     std::vector<uint8_t> m_backgroundColor;
     VnxVideo::PRawSample m_backgroundImage;
     std::vector<uint8_t> m_nosignalColor;
