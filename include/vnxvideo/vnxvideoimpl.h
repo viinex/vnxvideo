@@ -31,7 +31,16 @@ namespace VnxVideo
     };
     typedef std::shared_ptr<IRawSample> PRawSample;
 
+    // deep copy of one IRawSample, potentially with switching color format to I420
     VNXVIDEO_DECLSPEC IRawSample* CopyRawToI420(IRawSample*);
+
+    // same as vnxvideo_raw_sample_wrap.
+    // See comment to vnxvideo_buffer_wrap: same precaution applies. User should somehow guarantee that
+    // lifetime of underlying buffer is not shorter than lifetime of resulting IRawSample object.
+    VNXVIDEO_DECLSPEC IRawSample* WrapWithRawSample(EColorspace csp, int width, int height,
+        int* strides, uint8_t **planes);
+    // same as vnxvideo_raw_sample_allocate
+    VNXVIDEO_DECLSPEC IRawSample* AllocateRawSample(EColorspace csp, int width, int height);
 
     typedef typename std::function<void(ERawMediaFormat emf, int, int)> TOnFormatCallback;
     // ^^ A (new, as of 2022-10-01) convention on TOnFormatCallback.

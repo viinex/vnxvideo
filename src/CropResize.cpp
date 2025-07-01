@@ -104,4 +104,10 @@ namespace VnxVideo {
         sample->GetData(strides, planes);
         return new CRawSample(csp, width, height, strides, planes, true);
     }
+    IRawSample* WrapWithRawSample(EColorspace csp, int width, int height, int* strides, uint8_t **planes) {
+        return new CRawSample(csp, width, height, strides, planes, false);
+    }
+    IRawSample* AllocateRawSample(EColorspace csp, int width, int height) {
+        return new CRawSample(csp, width, height, nullptr, nullptr, true);
+    }
 }
