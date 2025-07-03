@@ -68,8 +68,8 @@ private:
         // which means that format conversion should be performed.
         // m_csp would typically be EMF_I420 in such cases.
 
-        if (csp != EMF_I420 && csp < EMF_AUDIO && planes != nullptr && !allocate)
-            throw std::logic_error("Sample format other than I420 is only supported when wrapping or allocating a frame");
+        if (csp != EMF_I420 && csp != EMF_NV12 && csp != EMF_GRAY && csp < EMF_AUDIO && planes != nullptr && !allocate)
+            throw std::logic_error("Sample format other than I420, NV12 or GRAY is only supported when wrapping or allocating a frame");
 
         if (allocate) {
             FillStridesOffsets(m_csp, m_width, m_height, m_nplanes, m_strides, m_offsets, true);
@@ -122,9 +122,9 @@ private:
             }
         }
         else {
+            FillStridesOffsets(m_csp, m_width, m_height, m_nplanes, nullptr, nullptr, false);
             m_data.reset(planes[0], [](void*) {});
-            m_nplanes = 3;
-            for (int k = 0; k < 3; ++k) {
+            for (int k = 0; k < m_nplanes; ++k) {
                 m_strides[k] = strides[k];
                 m_offsets[k] = planes[k] - m_data.get();
             }
@@ -221,6 +221,14 @@ public:
         const int nsamples = p1;
         const int nchannels = p2;
         auto ceilDim = alignStridesAndHeights ? ceil16 : [](int x) {return x; };
+        int stridesDummy[4];
+        ptrdiff_t offsetsDummy[4];
+        if (strides == nullptr) {
+            strides = stridesDummy;
+        }
+        if (offsets == nullptr) {
+            offsets = offsetsDummy;
+        }
         memset(strides, 0, sizeof(int) * 4);
         memset(offsets, 0, sizeof(ptrdiff_t) * 4);
         switch (emf) {
