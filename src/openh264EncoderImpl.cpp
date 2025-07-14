@@ -168,7 +168,7 @@ private:
         param.bEnableFrameSkip = 0;
         param.bEnableLongTermReference = 0; // long term reference control
         param.iLtrMarkPeriod = 30;
-        param.uiIntraPeriod = m_fps; // period of Intra frame
+        param.uiIntraPeriod = (m_fps ? m_fps : 30); // period of Intra frame
         param.bUseLoadBalancing = false;
         param.eSpsPpsIdStrategy = CONSTANT_ID;
         param.bPrefixNalAddingCtrl = 0;
