@@ -31,6 +31,7 @@ private:
     EColorspace m_csp;
     int m_width;
     int m_height;
+    int m_nframe;
 public:
     CFFmpegEncoderImpl(const char* profile, const char* preset, int fps, const char* quality, VnxVideo::ECodecImpl eci)
         : m_profile(profile)
@@ -39,6 +40,7 @@ public:
         , m_quality(quality)
         , m_codecImpl(eci)
         , m_qp(qualityEnumToQp(quality))
+        , m_nframe(0)
     {
         if (m_preset == "ultrafast" || m_preset == "superfast") { // QSV does not support these
             const_cast<std::string&>(m_preset) = "veryfast";
@@ -141,6 +143,9 @@ public:
             frm = dst;
         }
 #endif
+        if (m_nframe % m_cc->gop_size == 0)
+            frm->pict_type = AV_PICTURE_TYPE_I;
+        ++m_nframe;
 
         int ret = avcodec_send_frame(m_cc.get(), frm.get());
         if (ret < 0) {
@@ -208,7 +213,10 @@ private:
             cc.height = m_height;
             cc.framerate = { 25, 1 };
             cc.flags |= AV_CODEC_FLAG_LOW_DELAY;
+            cc.flags |= AV_CODEC_FLAG_CLOSED_GOP;
             cc.flags2 |= AV_CODEC_FLAG2_FAST;
+            //cc.flags &= ~AV_CODEC_FLAG_GLOBAL_HEADER;
+            //cc.flags2 |= AV_CODEC_FLAG2_LOCAL_HEADER;
             cc.gop_size = 50;
             cc.max_b_frames = 0;
             cc.has_b_frames = 0;
@@ -230,14 +238,20 @@ private:
                 VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
                     << res << ": " << fferr2str(res);
             }
-            res = av_opt_set_int(&cc, "idr_interval", 50, AV_OPT_SEARCH_CHILDREN);
+            res = av_opt_set_int(&cc, "forced_idr", 1, AV_OPT_SEARCH_CHILDREN);
+            if (res < 0) {
+                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set forced_idr: "
+                    << res << ": " << fferr2str(res);
+            }
+            res = av_opt_set_int(&cc, "idr_interval", 0, AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set idr_interval: "
                     << res << ": " << fferr2str(res);
             }
 
 #if defined(_WIN64) || defined(__linux__)
-            res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
+            const char* const hwDevicePath = getenv("VNX_HW_DEVICE_PATH");
+            res = av_hwdevice_ctx_create(&hw, hwDevType, hwDevicePath, nullptr, 0);
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
 		throw std::runtime_error("CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed");

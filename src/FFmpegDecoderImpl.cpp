@@ -47,7 +47,8 @@ public:
             AVBufferRef* hw = nullptr;
     	    VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "av_hwdevice_ctx_create about to be called, hwDevType=" << hwDevType;
             if (hwDevType != AV_HWDEVICE_TYPE_NONE) {
-                int res = av_hwdevice_ctx_create(&hw, hwDevType, nullptr, nullptr, 0);
+                const char* const hwDevicePath = getenv("VNX_HW_DEVICE_PATH");
+                int res = av_hwdevice_ctx_create(&hw, hwDevType, hwDevicePath, nullptr, 0);
                 if (res != 0) {
                     VNXVIDEO_LOG(VNXLOG_WARNING, "ffmpeg") << "av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
                     throw VnxVideo::XHWDeviceNotSupported();

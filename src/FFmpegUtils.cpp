@@ -371,7 +371,8 @@ void enumHwDevices() {
         t != AV_HWDEVICE_TYPE_NONE;
         t = av_hwdevice_iterate_types(t)) {
         AVBufferRef *hw = nullptr;
-        int res = av_hwdevice_ctx_create(&hw, t, nullptr, nullptr, 0);
+        const char* const hwDevicePath = getenv("VNX_HW_DEVICE_PATH");
+        int res = av_hwdevice_ctx_create(&hw, t, hwDevicePath, nullptr, 0);
         if (res < 0)
             continue;
         else
