@@ -203,7 +203,7 @@ int vnxvideo_raw_sample_copy(vnxvideo_raw_sample_t src, vnxvideo_raw_sample_t* d
         uint8_t* planes[4];
         s->GetFormat(csp, w, h);
         s->GetData(strides, planes);
-        dst->ptr = new CRawSample(csp, w, h, strides, planes, true);
+        dst->ptr = static_cast<VnxVideo::IRawSample*>(new CRawSample(csp, w, h, strides, planes, true));
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -214,7 +214,7 @@ int vnxvideo_raw_sample_copy(vnxvideo_raw_sample_t src, vnxvideo_raw_sample_t* d
 
 int vnxvideo_raw_sample_allocate(EColorspace csp, int width, int height, vnxvideo_raw_sample_t* dst) {
     try {
-        dst->ptr = new CRawSample(csp, width, height, nullptr, nullptr, true);
+        dst->ptr = static_cast<VnxVideo::IRawSample*>(new CRawSample(csp, width, height, nullptr, nullptr, true));
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
@@ -226,7 +226,7 @@ int vnxvideo_raw_sample_allocate(EColorspace csp, int width, int height, vnxvide
 int vnxvideo_raw_sample_wrap(EColorspace csp, int width, int height,
     int* strides, uint8_t **planes, vnxvideo_raw_sample_t* dst) {
     try {
-        dst->ptr = new CRawSample(csp, width, height, strides, planes, false);
+        dst->ptr = static_cast<VnxVideo::IRawSample*>(new CRawSample(csp, width, height, strides, planes, false));
         return vnxvideo_err_ok;
     }
     catch (const std::exception& e) {
