@@ -357,8 +357,8 @@ private:
             processAudio(lock);
             if (!m_dirty && !m_formatDirty)
                 continue;
-            if(!m_sizeless)
-                sanitizeTimestamps();
+            //if(!m_sizeless)
+            //    sanitizeTimestamps();
             auto samples = m_samples;
             int width = m_width;
             int height = m_height;
