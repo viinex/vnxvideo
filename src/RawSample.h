@@ -9,14 +9,14 @@
 
 class IAllocator {
 public:
-    ~IAllocator() {}
+    virtual ~IAllocator() {}
     virtual std::shared_ptr<uint8_t> Alloc(int size) = 0;
 };
 typedef std::shared_ptr<IAllocator> PAllocator;
 
 class IShmMapping {
 public:
-    ~IShmMapping() {}
+    virtual ~IShmMapping() {}
     virtual uint64_t FromPointer(void* ptr) = 0;
     virtual void* ToPointer(uint64_t offset) = 0;
 };
