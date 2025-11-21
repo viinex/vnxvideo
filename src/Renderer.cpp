@@ -670,7 +670,7 @@ private:
             if (swsContexts[k].get() == nullptr) {
                 sws.reset(sws_getContext(srcRoi.width, srcRoi.height, avPixFmt,
                     dstRoi.width, dstRoi.height, AV_PIX_FMT_YUV420P, 
-                    SWS_BICUBIC, nullptr, nullptr, nullptr), sws_freeContext);
+                    SWS_FAST_BILINEAR, nullptr, nullptr, nullptr), sws_freeContext);
                 swsContexts[k] = sws;
             }
             else
