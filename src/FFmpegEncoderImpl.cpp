@@ -16,9 +16,9 @@ extern "C" {
 class CFFmpegEncoderImpl : public VnxVideo::IMediaEncoder
 {
 private:
-    const std::string m_profile;
-    const std::string m_preset;
-    const std::string m_quality;
+    std::string m_profile;
+    std::string m_preset;
+    std::string m_quality;
     const int m_qp;
     const int m_fps;
     const VnxVideo::ECodecImpl m_codecImpl;
@@ -43,10 +43,10 @@ public:
         , m_nframe(0)
     {
         if (m_preset == "ultrafast" || m_preset == "superfast") { // QSV does not support these
-            const_cast<std::string&>(m_preset) = "veryfast";
+            m_preset = "veryfast";
         }
         if (m_profile == "baseline" && m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
-            const_cast<std::string&>(m_profile) = "constrained_baseline";
+            m_profile = "constrained_baseline";
         }
     }
     virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
