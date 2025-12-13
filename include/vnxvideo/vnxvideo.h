@@ -272,6 +272,11 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_media_source_get_extradata(vnxvideo_media_source_t source,
         EMediaSubtype media_subtype, vnxvideo_buffer_t* buffer); // may return NULL as buffer->ptr
 
+    // One example of a factory function to create a media source. This factory
+    // creates an object to read out the samples from a media file.
+    // For json format spec see FileVideoSource.cpp source.
+    VNXVIDEO_DECLSPEC int create_file_media_source(const char* json_config, vnxvideo_media_source_t* source);
+    
     // wrap a media source to have interface of h264 video source and vice versa.
     // ownership of object passed as an argument will be owned by resulting object.
     VNXVIDEO_DECLSPEC vnxvideo_h264_source_t  vnxvideo_media_source_to_h264(vnxvideo_media_source_t);

@@ -190,6 +190,27 @@ private:
         m_prevTs = m_tsDiff;
         m_pts0 = AV_NOPTS_VALUE;
     }
+    inline int isStartCode(const uint8_t* p) {
+        if(p[0]==0 && p[1]==0){
+            if(p[2]==1){
+                return 3;
+            }
+            else if(p[2]==0 && p[3]==1){
+                return 4;
+            }
+        }
+        return 0;
+    }
+    inline std::vector<uint8_t> nalCopyPrependStartCode(const uint8_t* begin, size_t length) {
+        static uint8_t sep[4] = {0, 0, 0, 1};
+        std::vector<uint8_t> b(sep, sep + sizeof(sep));
+        b.insert(b.end(), begin, begin + length);
+        return b;
+    }
+    inline std::vector<uint8_t> nalCopyPrependStartCode(const std::vector<uint8_t>& v) {
+        return nalCopyPrependStartCode(&v[0], v.size());
+    }
+    
     void doRun() {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_running) {
@@ -282,22 +303,55 @@ private:
                             while (pos < p.size) {
                                 // there'll be either NAL unit separator 0,0,0,1 in case of h264 stream (raw or TS),
                                 // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
-                                int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
-                                if (1 == len)
-                                    len = p.size - 4;
-                                CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                                int sc = isStartCode(p.data + pos);
+                                int len = 0;
+                                int nextpos = 0;
+                                if(sc == 0) {
+                                    len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
+                                    pos += 4;
+                                }
+                                else {
+                                    pos += sc;
+                                    for(int j = 0; j < p.size - pos - 3; ++j) {
+                                        int scp = isStartCode(p.data + pos + j);
+                                        if (scp) {
+                                            len = j;
+                                            break;
+                                        }
+                                    }
+                                    if (0 == len) {
+                                        len = p.size - pos;
+                                    }
+                                }
+                                std::vector<uint8_t> b(nalCopyPrependStartCode(p.data+pos, len));
+                                CNoOwnershipNalBuffer nalu(&b[0], b.size());
                                 onBuffer(&nalu, ts);
-                                pos += len + 4;
+                                pos += len;
                             }
                         }
                         else if (mediaSubtype == EMST_HEVC) {
                             int pos = 0;
                             while (pos < p.size) {
-                                // there'll be either NAL unit separator 0,0,0,1 in case of h265 stream (raw or TS),
-                                // or 4 bytes of the length of NAL unit in case of file encoding (mp4/mov)
-                                int len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
-                                if (1 == len)
-                                    len = p.size - 4;
+                                int sc = isStartCode(p.data + pos);
+                                int len = 0;
+                                int nextpos = 0;
+                                if(sc == 0) {
+                                    len = (p.data[pos + 0] << 24) + (p.data[pos + 1] << 16) + (p.data[pos + 2] << 8) + (p.data[pos + 3] << 0);
+                                    pos += 4;
+                                }
+                                else {
+                                    pos += sc;
+                                    for(int j = 0; j < p.size - pos - 3; ++j) {
+                                        int scp = isStartCode(p.data + pos + j);
+                                        if (scp) {
+                                            len = j;
+                                            break;
+                                        }
+                                    }
+                                    if (0 == len) {
+                                        len = p.size - pos;
+                                    }
+                                }
 
                                 if (len > 0) {
                                     uint8_t typ = (p.data[pos + 4] & 0x7e) >> 1;
@@ -310,10 +364,11 @@ private:
                                         onBuffer(&pps, ts);
                                     }
                                 }
-
-                                CNoOwnershipNalBuffer nalu(p.data + pos + 4, len);
+                                
+                                std::vector<uint8_t> b(nalCopyPrependStartCode(p.data+pos, len));
+                                CNoOwnershipNalBuffer nalu(&b[0], b.size());
                                 onBuffer(&nalu, ts);
-                                pos += len + 4;
+                                pos += len;
                             }
                         }
                         else if (mediaSubtype == EMST_AAC || mediaSubtype == EMST_OPUS) {
@@ -504,11 +559,11 @@ private:
                 << pps.size() << " pps.";
         }
         if (!vps.empty())
-            m_vps = vps[0];
+            m_vps = nalCopyPrependStartCode(vps[0]);
         if (!sps.empty())
-            m_sps = sps[0];
+            m_sps = nalCopyPrependStartCode(sps[0]);
         if (!pps.empty())
-            m_pps = pps[0];
+            m_pps = nalCopyPrependStartCode(pps[0]);
     }
 
 private:
