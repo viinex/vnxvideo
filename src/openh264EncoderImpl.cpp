@@ -87,7 +87,7 @@ public:
             sampleI420->GetData(strides_dst, planes_dst);
             int res = sws_scale(m_swsc.get(), planes, strides, 0, m_height, planes_dst, strides_dst);
             if (res != m_height) {
-                VNXVIDEO_LOG(VNXLOG_WARNING, "renderer") << "COpenH264::Encoder: sws_scale failed";
+                VNXVIDEO_LOG(VNXLOG_WARNING, "openh264") << "COpenH264::Encoder: sws_scale failed";
                 return;
             }
             else {
@@ -123,20 +123,26 @@ public:
     }
 private:
     void init(){
-        m_encoder.reset();
-        ISVCEncoder* encoder;
-        int res = WelsCreateSVCEncoder(&encoder);
-        if (res)
-            throw std::runtime_error("WelsCreateSVCEncoder failed");
-        auto logcb = openh264log;
-        encoder->SetOption(ENCODER_OPTION_TRACE_CALLBACK, &logcb);
-        auto loglevel = WELS_LOG_INFO;
-        encoder->SetOption(ENCODER_OPTION_TRACE_LEVEL, &loglevel);
-
         int qp;
         ECOMPLEXITY_MODE complexity;
         EProfileIdc profile;
         qualityEnumToQpAndComplexity(m_profile, m_quality, m_preset, profile, qp, complexity);
+
+        m_encoder.reset();
+        std::unique_ptr<ISVCEncoder> encoder;
+        int res;
+        {
+            ISVCEncoder* e = nullptr;
+            res = WelsCreateSVCEncoder(&e);
+            if (res)
+                throw std::runtime_error("WelsCreateSVCEncoder failed");
+            else
+                encoder.reset(e);
+        }
+        auto logcb = openh264log;
+        encoder->SetOption(ENCODER_OPTION_TRACE_CALLBACK, &logcb);
+        auto loglevel = WELS_LOG_INFO;
+        encoder->SetOption(ENCODER_OPTION_TRACE_LEVEL, &loglevel);
 
         SEncParamExt param;
         encoder->GetDefaultParams(&param);
@@ -178,14 +184,10 @@ private:
         param.iMinQp = qp-1;
         res = encoder->InitializeExt(&param);
         if (res) {
-            WelsDestroySVCEncoder(encoder);
             VNXVIDEO_LOG(VNXLOG_ERROR, "openh264") << "ISVCEncoder::InitializeExt failed, res=" << res;
             throw std::runtime_error("Could not initialize encoder: ISVCEncoder::InitializeExt failed");
         }
-        m_encoder.reset(encoder, [](ISVCEncoder* e) {
-            e->Uninitialize();
-            WelsDestroySVCEncoder(e);
-        });
+        m_encoder.reset(encoder.release());
     }
     static EVideoFormatType csp2vf(EColorspace csp) {
         switch (csp) {
