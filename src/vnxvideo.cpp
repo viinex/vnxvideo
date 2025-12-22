@@ -6,6 +6,9 @@
 #include "json.hpp"
 #include "jget.h"
 #include <ipp.h>
+#ifdef __linux__
+#include <malloc.h>
+#endif
 
 using json = nlohmann::json;
 
@@ -30,6 +33,11 @@ void vnx_atexit() {
 }
 
 int vnxvideo_init(vnxvideo_log_t log_handler, void* usrptr, ELogLevel max_level) {
+#ifdef __linux__
+    if(getenv("MALLOC_ARENA_MAX") == nullptr) {
+        mallopt(M_ARENA_MAX, 4);
+    }
+#endif
 
     if (nullptr != NVnxVideoLogImpl::g_logHandler) {
         return vnxvideo_err_invalid_parameter;
