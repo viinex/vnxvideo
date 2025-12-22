@@ -16,26 +16,49 @@ public:
     }
     void SetFormat(EColorspace csp, int width, int height) {
         std::unique_lock<std::mutex> lock(m_mutex);
-        while (m_busy)
+        while (m_continue && m_busy)
             m_cond.wait_for(lock, std::chrono::milliseconds(200));
+
+        if(!m_continue)
+            return;
+        m_busy = true;
+        lock.unlock();
+
         m_impl->SetFormat(csp, width, height);
+        lock.lock();
+        m_busy = false;
+        m_cond.notify_all();
     }
     void Process(VnxVideo::IRawSample* sample, uint64_t timestamp) {
         std::unique_lock<std::mutex> lock(m_mutex);
+        if(!m_continue)
+            return;
         m_sample.reset(sample->Dup());
         m_timestamp = timestamp;
         m_cond.notify_all();
     }
     void Flush() {
         std::unique_lock<std::mutex> lock(m_mutex);
-        while (m_busy)
+        while (m_continue && m_busy)
             m_cond.wait_for(lock, std::chrono::milliseconds(200));
+        if (!m_continue)
+            return;
+
+        m_busy = true;
+
+        lock.unlock();
         m_impl->Flush();
+
+        lock.lock();
+        m_busy = false;
+        m_cond.notify_all();
     }
     ~CAsyncProc() {
         std::unique_lock<std::mutex> lock(m_mutex);
         m_continue = false;
         m_cond.notify_all();
+        while(m_busy)
+            m_cond.wait(lock);
         lock.unlock();
         if(m_thread.get_id()!=std::this_thread::get_id())
             m_thread.join();
@@ -44,7 +67,7 @@ protected:
     void processThread() {
         std::unique_lock<std::mutex> lock(m_mutex);
         while (m_continue) {
-            while (m_continue && m_sample.get() == nullptr)
+            while (m_continue && (m_sample.get() == nullptr || m_busy))
                 m_cond.wait(lock);
             if (!m_continue)
                 break;
