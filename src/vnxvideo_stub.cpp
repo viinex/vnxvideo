@@ -378,5 +378,13 @@ int vnxvideo_raw_sample_wrap(EColorspace csp, int width, int height,
     return vnxvideo_err_not_implemented;
 }
 
+int vnxvideo_h264_source_subscribe(vnxvideo_h264_source_t source,
+    vnxvideo_on_buffer_t handle_data, void* usrptr) {
+    return vnxvideo_err_not_implemented;
+}
+int vnxvideo_h264_source_events_subscribe(vnxvideo_h264_source_t source,
+    vnxvideo_on_json_t handle_event, void* usrptr) {
+    return vnxvideo_err_not_implemented;
+}
 
 #endif
