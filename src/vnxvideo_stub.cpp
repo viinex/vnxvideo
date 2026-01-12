@@ -45,6 +45,9 @@ int vnxvideo_video_source_stop(vnxvideo_videosource_t src) {
 int vnxvideo_raw_sample_dup(vnxvideo_raw_sample_t src, vnxvideo_raw_sample_t* dst) {
     return vnxvideo_err_not_implemented;
 }
+int vnxvideo_raw_sample_copy(vnxvideo_raw_sample_t src, vnxvideo_raw_sample_t* dst) {
+    return vnxvideo_err_not_implemented;
+}
 
 int vnxvideo_raw_sample_allocate(EColorspace csp, int width, int height, vnxvideo_raw_sample_t* dst) {
     return vnxvideo_err_not_implemented;
@@ -343,4 +346,37 @@ VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_video(ERawMediaFormat emf) {
 VNXVIDEO_DECLSPEC bool vnxvideo_emf_is_audio(ERawMediaFormat emf) {
     return emf > EMF_AUDIO;
 }
+
+int vnxvideo_buffer_wrap(const uint8_t *data, int size, vnxvideo_buffer_t* res) {
+    return vnxvideo_err_not_implemented;
+}
+
+int vnxvideo_buffer_copy_wrap(const uint8_t *data, int size, vnxvideo_buffer_t* res) {
+    return vnxvideo_err_not_implemented;
+}
+
+int vnxvideo_buffer_copy(vnxvideo_buffer_t src, vnxvideo_buffer_t* dst) {
+    return vnxvideo_err_not_implemented;
+}
+
+int vnxvideo_raw_sample_select_roi(vnxvideo_raw_sample_t in,
+    int roi_left, int roi_top, int roi_width, int roi_height,
+    vnxvideo_raw_sample_t* out)
+{
+    return vnxvideo_err_not_implemented;
+}
+
+int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
+    int roi_left, int roi_top, int roi_width, int roi_height, 
+    int target_width, int target_height, 
+    vnxvideo_raw_sample_t* out) 
+{
+    return vnxvideo_err_not_implemented;
+}
+int vnxvideo_raw_sample_wrap(EColorspace csp, int width, int height,
+    int* strides, uint8_t **planes, vnxvideo_raw_sample_t* dst) {
+    return vnxvideo_err_not_implemented;
+}
+
+
 #endif
