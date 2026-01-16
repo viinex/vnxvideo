@@ -9,7 +9,11 @@
 #include <codecvt>
 #include <thread>
 #include <mutex>
+#include <atomic>
+#include <cstdint>
 
+#include <sys/time.h>
+#include <time.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -108,7 +112,59 @@ namespace
         case EMF_RGB16: return V4L2_PIX_FMT_RGB565;
         case EMF_RGB24: return V4L2_PIX_FMT_BGR24;
         case EMF_RGB32: return V4L2_PIX_FMT_BGR32;
+        default: return 0;
         }
+    }
+
+    // Helper to calculate the current offset between Realtime and Monotonic time
+    static int64_t calculate_time_offset() {
+        struct timeval tv_real;
+        struct timespec ts_mono;
+
+        // Get current Wall Clock time (UNIX Epoch)
+        gettimeofday(&tv_real, nullptr);
+
+        // Get current Monotonic time (matching V4L2 default)
+        clock_gettime(CLOCK_MONOTONIC, &ts_mono);
+
+        // Convert both to milliseconds
+        int64_t real_ms = (static_cast<int64_t>(tv_real.tv_sec) * 1000) +
+            (tv_real.tv_usec / 1000);
+        int64_t mono_ms = (static_cast<int64_t>(ts_mono.tv_sec) * 1000) +
+            (ts_mono.tv_nsec / 1000000);
+
+        // Calculate offset: Real = Mono + Offset
+        return real_ms - mono_ms;
+    }
+
+    // helper to convert monotonic timestamp returned from v4l2 to the absolute timestamp
+    // expected by viinex
+    uint64_t v4l2_timestamp_to_epoch_ms(const struct timeval& v4l2_tv) {
+        // Thread-safe static initialization ensures this is calculated 
+        // exactly once before any thread uses it.
+        static std::atomic<int64_t> offset_ms{ calculate_time_offset() };
+        static std::atomic<uint64_t> call_counter{ 0 };
+
+        // Increment counter atomically. fetch_add returns the value *before* increment.
+        // We update if the *next* value (current + 1) is a multiple of 1000.
+        uint64_t current_count = call_counter.fetch_add(1, std::memory_order_relaxed);
+
+        // Every 1000th call, refresh the offset.
+        // Only the specific thread that hits this condition pays the cost of syscalls.
+        if ((current_count + 1) % 1000 == 0) {
+            int64_t new_offset = calculate_time_offset();
+            offset_ms.store(new_offset, std::memory_order_release);
+        }
+
+        // Convert input V4L2 timestamp to milliseconds
+        int64_t input_ms = (static_cast<int64_t>(v4l2_tv.tv_sec) * 1000) + 
+            (v4l2_tv.tv_usec / 1000);
+
+        // Apply the current offset
+        // memory_order_acquire ensures we see the most recent update from the writer thread
+        int64_t current_offset = offset_ms.load(std::memory_order_acquire);
+
+        return static_cast<uint64_t>(input_ms + current_offset);
     }
 }
 
@@ -216,6 +272,7 @@ private:
     int m_nplanes; // first of all, the number of planes
     int m_strides[4];
     ptrdiff_t m_offsets[4];
+
 private:
     void captureLoop(){
         for (;;) {
@@ -257,8 +314,7 @@ private:
             if(r<0)
                 continue;
 
-            // compute the relative timestamp so that it matches the viinex units (milliseconds)
-            uint64_t timestamp=buf.timestamp.tv_usec/1000+buf.timestamp.tv_sec*1000;
+            uint64_t timestamp=v4l2_timestamp_to_epoch_ms(buf.timestamp);
 
             if(callFormat){
                 onFormat(EMF_I420, m_width, m_height); // not m_csp, because we convert to I420 upon receiving
