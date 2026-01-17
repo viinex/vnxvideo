@@ -45,4 +45,7 @@ clean:
 install:
 	sudo cp $(TARGET) /usr/local/lib
 
+stub:
+	gcc -shared -o $(TARGET)  src/vnxvideo_stub.cpp -Iinclude/vnxvideo -DVNXVIDEO_BUILD_STUB -DVNXVIDEO_EXPORTS -fPIC
+
 -include $(DEPS)
