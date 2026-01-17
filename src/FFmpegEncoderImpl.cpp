@@ -42,11 +42,22 @@ public:
         , m_qp(qualityEnumToQp(quality))
         , m_nframe(0)
     {
-        if (m_preset == "ultrafast" || m_preset == "superfast") { // QSV does not support these
+        if (m_preset == "ultrafast" || m_preset == "superfast") {
             m_preset = "veryfast";
         }
         if (m_profile == "baseline" && m_codecImpl == VnxVideo::ECodecImpl::ECI_VAAPI) {
             m_profile = "constrained_baseline";
+        }
+        if (m_codecImpl == VnxVideo::ECodecImpl::ECI_CUDA) {
+            if (m_preset == "veryfast" || m_preset == "faster" || m_preset == "fast") {
+                m_preset = "llhp"; // low latency
+            }
+            if (m_preset == "veryslow" || m_preset == "slower" || m_preset == "slow") {
+                m_preset = "llhq";
+            }
+            if (m_preset == "medium") {
+                m_preset = "ll";
+            }
         }
     }
     virtual void Subscribe(VnxVideo::TOnBufferCallback onBuffer) {
@@ -225,28 +236,34 @@ private:
 
             int res = av_opt_set(&cc, "profile", m_profile.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set profile: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set profile: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set(&cc, "preset", m_preset.c_str(), AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set preset: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set preset: "
                     << res << ": " << fferr2str(res);
             }
             res = av_opt_set_int(&cc, "qp", m_qp, AV_OPT_SEARCH_CHILDREN);
             if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
+                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
                     << res << ": " << fferr2str(res);
             }
-            res = av_opt_set_int(&cc, "forced_idr", 1, AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set forced_idr: "
-                    << res << ": " << fferr2str(res);
+            std::vector<const char*> enableOpts = { "forced_idr", "forced-idr" };
+            std::vector<const char*> disableOpts = { "idr_interval", "sei", "timing", "extra_sei", "udu_sei", "aud", "s12m_tc", "a53cc", "a53_cc" };
+            for(auto v: enableOpts) {
+                res = av_opt_set_int(&cc, v, 1, AV_OPT_SEARCH_CHILDREN);
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to enable " << v << ": "
+                                                           << res << ": " << fferr2str(res);
+                }
             }
-            res = av_opt_set_int(&cc, "idr_interval", 0, AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_INFO, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set idr_interval: "
-                    << res << ": " << fferr2str(res);
+            for(auto v: disableOpts) {
+                res = av_opt_set_int(&cc, v, 0, AV_OPT_SEARCH_CHILDREN);
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to disable " << v << ": "
+                                                           << res << ": " << fferr2str(res);
+                }
             }
 
 #if defined(_WIN64) || defined(__linux__)
