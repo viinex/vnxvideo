@@ -397,7 +397,9 @@ private:
                     std::pair<VnxVideo::PRawSample, uint64_t> res =
                         doRender(width, height, backgroundColor, backgroundImage, nosignalImage,
                                  *layout.get(), *swsContexts.get(), m_allocator.get(), samples);
-                    onFrame(res.first.get(), res.second);
+                    if(res.second != 0) { // res.second == 0 means no samples were received yet
+                        onFrame(res.first.get(), res.second);
+                    }
                 }
                 catch(const std::exception& e) {
                     VNXVIDEO_LOG(VNXLOG_WARNING, "renderer") << "CRenderer::doRender(): " << e.what();
