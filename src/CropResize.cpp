@@ -1,4 +1,4 @@
-#include <ippi.h>
+#include <ipp/ippi.h>
 
 extern "C" {
 #include <libswscale/swscale.h>

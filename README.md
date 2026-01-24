@@ -17,13 +17,13 @@ vnxvideotest is just a playground to experiment with various components implemen
 
 In order to build vnxvideo library, the following dependencies are required:
 
-boost >= 1.41 && <= 1.70
+boost >= 1.41
 
-OpenH264 2.0.0 (https://www.openh264.org/)
+OpenH264 >= 2.0.0 (https://www.openh264.org/)
 
-Intel IPP 2019 (https://software.intel.com/en-us/intel-ipp)
+Intel OneAPI (IPP 2019, OneAPI 2022) (https://software.intel.com/en-us/intel-ipp)
 
-FFmpeg 3.3 (https://ffmpeg.org/download.html)
+FFmpeg >= 6 (https://ffmpeg.org/download.html)
 
 On Windows, DirectShow examples base classes library are also necessary (available at https://github.com/Microsoft/Windows-classic-samples/tree/master/Samples/Win7Samples/multimedia/directshow/baseclasses or https://github.com/viinex/ambase). This project should be built in advance.
 
@@ -35,7 +35,14 @@ After that you should be able to build Release and Debug configurations of vnxvi
 
 ### Linux
 
-Install boost-dev and ffmpeg-dev packages on your system. Build and install openh264 library and install IPP.
+Install boost-dev and libopenh264-dev packages on your system from stock distribution repository.
+Install `intel-oneapi-ipp-devel`. For that, Intel package repository needs to be added to sources.list:
+```
+wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | tee /etc/apt/sources.list.d/oneAPI.list
+apt-get update
+apt-get install -y intel-oneapi-ipp-devel
+```
+FFmpeg needs to be built from source at least on Debian 12 (because vnxvideo depends on FFmpeg >=6 whereas Debian 12 shipts with an older version).
 Set the variables IPP_HOME and OPENH264_HOME (FFMPEG_HOME may also be set a custom build in a non-system-wide location is preferred).
 
 After that you should be able to build the libvnxvideo.so library using the GNU make command.

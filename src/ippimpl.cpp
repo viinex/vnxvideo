@@ -2,7 +2,7 @@
 #include <cstring>
 #include <memory>
 #include <algorithm>
-#include <ippi.h>
+#include <ipp/ippi.h>
 #include "vnxipp.h"
 
 extern "C"{

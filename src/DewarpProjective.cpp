@@ -1,7 +1,7 @@
 #ifndef __aarch64__
 #include <boost/lexical_cast.hpp>
-#include <ippi.h>
-#include <ipp.h>
+#include <ipp/ippi.h>
+#include <ipp/ipp.h>
 
 #include "json.hpp"
 #include "jget.h"

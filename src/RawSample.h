@@ -2,8 +2,8 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <ippi.h>
-#include <ippcc.h>
+#include <ipp/ippi.h>
+#include <ipp/ippcc.h>
 #include "vnxipp.h"
 #include "vnxvideoimpl.h"
 

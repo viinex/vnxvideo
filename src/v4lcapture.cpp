@@ -32,8 +32,8 @@ using json = nlohmann::json;
 #include "vnxvideoimpl.h"
 #include "vnxvideologimpl.h"
 
-#include <ippcc.h>
-#include <ippi.h>
+#include <ipp/ippcc.h>
+#include <ipp/ippi.h>
 
 #include "RawSample.h"
 

@@ -2,8 +2,8 @@
 #include <mutex>
 #include <algorithm>
 #include <cstring>
-#include <ippcc.h>
-#include <ippi.h>
+#include <ipp/ippcc.h>
+#include <ipp/ippi.h>
 
 #include "vnxipp.h"
 #include "vnxvideoimpl.h"

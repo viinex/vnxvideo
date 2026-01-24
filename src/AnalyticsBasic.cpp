@@ -11,9 +11,9 @@ using json = nlohmann::json;
 #include "vnxvideologimpl.h"
 #include "GrayAnalyticsBase.h"
 
-#include <ipp.h>
-#include <ippi.h>
-#include <ippcv.h>
+#include <ipp/ipp.h>
+#include <ipp/ippi.h>
+#include <ipp/ippcv.h>
 
 extern "C" {
 #include <libswscale/swscale.h>
