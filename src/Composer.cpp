@@ -2,8 +2,6 @@
 #include <mutex>
 #include <algorithm>
 #include <cstring>
-#include <ipp/ippcc.h>
-#include <ipp/ippi.h>
 
 #include "vnxipp.h"
 #include "vnxvideoimpl.h"
@@ -47,8 +45,8 @@ public:
         std::lock_guard<std::mutex> lock(m_mutex);
         if (m_overlay.get() == nullptr)
             return;
-        IppiSize roi = { std::min(m_overlayWidth, m_width-m_overlayLeft), std::min(m_overlayHeight, m_height-m_overlayTop) };
-        IppiSize roi2 = { roi.width/2, roi.height/2 };
+        VnxIppiSize roi = { std::min(m_overlayWidth, m_width-m_overlayLeft), std::min(m_overlayHeight, m_height-m_overlayTop) };
+        VnxIppiSize roi2 = { roi.width/2, roi.height/2 };
         int strides[4];
         uint8_t *planes[4];
         s->GetData(strides, planes);
@@ -57,16 +55,16 @@ public:
         planes[1] += (m_overlayTop/2)*strides[1] + m_overlayLeft / 2;
         planes[2] += (m_overlayTop/2)*strides[2] + m_overlayLeft / 2;
 
-        ippiCopy_8u_C1MR(m_overlayPrepared.get(), 
+        vnxippiCopy_8u_C1MR(m_overlayPrepared.get(), 
             m_overlayWidth,
             planes[0],strides[0],
             roi,
             m_mask.get(), m_overlayWidth);
-        ippiCopy_8u_C1MR(m_overlayPrepared.get() + (m_overlayHeight*m_overlayWidth * 4) / 4, m_overlayWidth / 2,
+        vnxippiCopy_8u_C1MR(m_overlayPrepared.get() + (m_overlayHeight*m_overlayWidth * 4) / 4, m_overlayWidth / 2,
             planes[1], strides[1],
             roi2,
             m_mask2.get(), m_overlayWidth / 2);
-        ippiCopy_8u_C1MR(m_overlayPrepared.get() + (m_overlayHeight*m_overlayWidth * 5) / 4, m_overlayWidth / 2,
+        vnxippiCopy_8u_C1MR(m_overlayPrepared.get() + (m_overlayHeight*m_overlayWidth * 5) / 4, m_overlayWidth / 2,
             planes[2], strides[2],
             roi2,
             m_mask2.get(), m_overlayWidth / 2);
@@ -114,8 +112,8 @@ private:
         int pitchU = m_overlayWidth / 2;
         int offsetV = m_overlayWidth*m_overlayHeight * 5 / 4;
         int pitchV = m_overlayWidth / 2;
-        IppiSize roi = { m_overlayWidth, m_overlayHeight };
-        Ipp8u* dst[3] = {
+        VnxIppiSize roi = { m_overlayWidth, m_overlayHeight };
+        uint8_t* dst[3] = {
             m_overlayPrepared.get() + offsetY,
             m_overlayPrepared.get() + offsetU,
             m_overlayPrepared.get() + offsetV
@@ -137,7 +135,7 @@ private:
                     m_mask.get()[x + y*m_overlayWidth] = p[x] == key? 0 : 1;
             }
             if (m_csp == EMF_I420) {
-                ippiBGRToYCbCr420_8u_AC4P3R(planes[0], strides[0], dst, steps, roi);
+                vnxippiBGRToYCbCr420_8u_AC4P3R(planes[0], strides[0], dst, steps, roi);
             }
             break;
         }
@@ -151,7 +149,7 @@ private:
                 }
             }
             if (m_csp == EMF_I420) {
-                ippiBGRToYCbCr420_8u_C3P3R(planes[0], strides[0], dst, steps, roi);
+                vnxippiBGRToYCbCr420_8u_C3P3R(planes[0], strides[0], dst, steps, roi);
             }
             break;
         }
@@ -172,12 +170,12 @@ private:
             throw std::logic_error("unsupported format, and this should not happen (should have been thrown earlier)");
         }
         { // prepare subsampled mask for U and V planes
-            IppiSize sz = { m_overlayWidth, m_overlayHeight };
-            IppiRect roi = { 0,0,m_overlayWidth, m_overlayHeight };
-            IppiSize sz2 = { m_overlayWidth / 2, m_overlayHeight / 2 };
+            VnxIppiSize sz = { m_overlayWidth, m_overlayHeight };
+            VnxIppiRect roi = { 0,0,m_overlayWidth, m_overlayHeight };
+            VnxIppiSize sz2 = { m_overlayWidth / 2, m_overlayHeight / 2 };
             vnxippiResize_8u_C1R(m_mask.get(), { sz.width, sz.height }, m_overlayWidth, 
             {roi.x,roi.y,roi.width, roi.height}, m_mask2.get(), m_overlayWidth / 2, { sz2.width, sz2.height },
-                0.5, 0.5, IPPI_INTER_NN);
+                0.5, 0.5, VNXIPPI_INTER_NN);
         }
     }
 };

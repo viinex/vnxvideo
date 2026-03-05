@@ -32,8 +32,7 @@ using json = nlohmann::json;
 #pragma comment(lib, "strmbase.lib")
 #endif
 
-#include <ipp/ippcc.h>
-#include <ipp/ippi.h>
+#include "vnxipp.h"
 
 #include "../RawSample.h"
 

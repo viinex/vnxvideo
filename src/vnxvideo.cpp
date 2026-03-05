@@ -5,7 +5,7 @@
 #include <locale>
 #include "json.hpp"
 #include "jget.h"
-#include <ipp.h>
+#include "vnxipp.h"
 #ifdef __linux__
 #include <malloc.h>
 #endif
@@ -47,8 +47,8 @@ int vnxvideo_init(vnxvideo_log_t log_handler, void* usrptr, ELogLevel max_level)
     NVnxVideoLogImpl::g_maxLogLevel = max_level;
 
 #ifndef __aarch64__
-    IppStatus ipps=ippInit();
-    if (ipps != ippStsNoErr && ipps != ippStsNonIntelCpu) {
+    VnxIppStatus ipps=vnxippInit();
+    if (ipps != vnxippStsNoErr && ipps != vnxippStsNonIntelCpu) {
         VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "Failed to initialize IPP libraries: " << ipps;
         return vnxvideo_err_external_api;
     }

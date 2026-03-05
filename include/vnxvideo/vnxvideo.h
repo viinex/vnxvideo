@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <stdint.h>
@@ -209,6 +210,7 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_hevc_decoder_create(vnxvideo_decoder_t* decoder);
     VNXVIDEO_DECLSPEC int vnxvideo_h264_sw_decoder_create(vnxvideo_decoder_t* decoder); // software
     VNXVIDEO_DECLSPEC int vnxvideo_hevc_sw_decoder_create(vnxvideo_decoder_t* decoder); // software
+    VNXVIDEO_DECLSPEC int vnxvideo_video_decoder_create(const char* json_config, vnxvideo_decoder_t* decoder);
     VNXVIDEO_DECLSPEC void vnxvideo_decoder_free(vnxvideo_decoder_t decoder);
     VNXVIDEO_DECLSPEC int vnxvideo_decoder_subscribe(vnxvideo_decoder_t decoder,
         vnxvideo_on_frame_format_t handle_format, void* usrptr_format,
@@ -216,6 +218,13 @@ extern "C" {
     VNXVIDEO_DECLSPEC int vnxvideo_decoder_decode(vnxvideo_decoder_t decoder, vnxvideo_buffer_t buffer, uint64_t timestamp);
     VNXVIDEO_DECLSPEC int vnxvideo_decoder_flush(vnxvideo_decoder_t decoder);
 
+    VNXVIDEO_DECLSPEC int vnxvideo_decoder_decode_many(vnxvideo_decoder_t decoder,
+                                                       int count, // number of buffers passed
+                                                       vnxvideo_buffer_t *buffers, uint64_t timestamps,
+                                                       int* geometry, // 4-tuples (l,t,r,b) laid out sequentially
+                                                       int* res, vnxvideo_raw_sample_t dest);
+
+    
     VNXVIDEO_DECLSPEC int vnxvideo_renderer_create(int refresh_rate, vnxvideo_renderer_t* renderer);
     VNXVIDEO_DECLSPEC vnxvideo_videosource_t vnxvideo_renderer_to_videosource(vnxvideo_renderer_t); // cast, not duplication
     // all the inputs (rawproc objects) created by the next function should not be used after the parent renderer is destroyed.

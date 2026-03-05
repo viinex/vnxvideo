@@ -1,4 +1,4 @@
-#include <ipp/ippi.h>
+#include "vnxipp.h"
 
 extern "C" {
 #include <libswscale/swscale.h>
@@ -45,10 +45,10 @@ int vnxvideo_raw_sample_crop_resize(vnxvideo_raw_sample_t in,
         // size and pixel format matches -- just copy the data taking ROI into account
         for (int k = 0; k < 3; ++k) {
             int div = (k == 0) ? 1 : 2; // plane dimension size divisor wrt to original size
-            IppiSize roi = { target_width / div, target_height / div };
-            IppStatus st=ippiCopy_8u_C1R(planesSrc[k] + roi_top*stridesSrc[k] / div + roi_left / div,
+            VnxIppiSize roi = { target_width / div, target_height / div };
+            VnxIppStatus st=vnxippiCopy_8u_C1R(planesSrc[k] + roi_top*stridesSrc[k] / div + roi_left / div,
                 stridesSrc[k], planesDst[k], stridesDst[k], roi);
-            if (st != ippStsNoErr) {
+            if (st != vnxippStsNoErr) {
                 VNXVIDEO_LOG(VNXLOG_ERROR, "vnxvideo") << "vnxvideo_raw_sample_crop_resize: ippiCopy_8u_C1R returned a non-ok code: " << st;
                 return vnxvideo_err_external_api;
             }

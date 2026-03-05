@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdlib>
-#include <ipp/ippi.h>
-#include <ipp/ippcc.h>
 #include "vnxipp.h"
 #include "vnxvideoimpl.h"
 
@@ -324,22 +322,22 @@ public:
         EColorspace src_emf, const uint8_t* const* src, int* src_strides,
         uint8_t** dst, int* dst_strides)
     {
-        IppiSize roi = { width, height };
+        vnxippiSize roi = { width, height };
         if (src_emf == EMF_I420) {
-            ippiYCbCr420ToYCbCr422_8u_P3R((const Ipp8u**)src, src_strides, dst, dst_strides, roi);
+            vnxippiYCbCr420ToYCbCr422_8u_P3R((const Ipp8u**)src, src_strides, dst, dst_strides, roi);
         }
         else if (src_emf == EMF_YV12)
         {
-            ippiYCrCb420ToYCbCr422_8u_P3R((const Ipp8u**)src, src_strides, dst, dst_strides, roi);
+            vnxippiYCrCb420ToYCbCr422_8u_P3R((const Ipp8u**)src, src_strides, dst, dst_strides, roi);
         }
         else if (src_emf == EMF_YUY2)
         {
             // todo - swap dst u and v planes here
-            ippiYCrCb422ToYCbCr422_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
+            vnxippiYCrCb422ToYCbCr422_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }
         else if (src_emf == EMF_UYVY)
         {
-            ippiCbYCr422ToYCbCr422_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
+            vnxippiCbYCr422ToYCbCr422_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }
     }
     */
@@ -347,66 +345,66 @@ public:
         EColorspace src_emf, const uint8_t* const* src, int* src_strides, 
         uint8_t** dst, int* dst_strides) 
     {
-        IppiSize roi = { width, height };
+        VnxIppiSize roi = { width, height };
         if (src_emf == EMF_I420) {
-            IppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            ippiCopy_8u_C1R(src[1], src_strides[1], dst[1], dst_strides[1], roi2);
-            ippiCopy_8u_C1R(src[2], src_strides[2], dst[2], dst_strides[2], roi2);
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiCopy_8u_C1R(src[1], src_strides[1], dst[1], dst_strides[1], roi2);
+            vnxippiCopy_8u_C1R(src[2], src_strides[2], dst[2], dst_strides[2], roi2);
         }
         else if (src_emf == EMF_YV12)
         {
-            IppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            ippiCopy_8u_C1R(src[2], src_strides[2], dst[1], dst_strides[1], roi2);
-            ippiCopy_8u_C1R(src[1], src_strides[1], dst[2], dst_strides[2], roi2);
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiCopy_8u_C1R(src[2], src_strides[2], dst[1], dst_strides[1], roi2);
+            vnxippiCopy_8u_C1R(src[1], src_strides[1], dst[2], dst_strides[2], roi2);
         }
         else if (src_emf == EMF_NV12)
         {
             vnxippiResize_8u_P2P3R(src, { width, height }, src_strides, { 0,0,width,height }, dst, dst_strides,
-                { 0,0,width,height }, 1, 1, IPPI_INTER_NN);
+                { 0,0,width,height }, 1, 1, VNXIPPI_INTER_NN);
         }
         else if (src_emf == EMF_I444)
         {
             VnxIppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height }, dst[1], dst_strides[1], roi2, 0.5, 0.5, IPPI_INTER_NN);
-            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height }, dst[2], dst_strides[2], roi2, 0.5, 0.5, IPPI_INTER_NN);
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height }, dst[1], dst_strides[1], roi2, 0.5, 0.5, VNXIPPI_INTER_NN);
+            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height }, dst[2], dst_strides[2], roi2, 0.5, 0.5, VNXIPPI_INTER_NN);
         }
         else if (src_emf == EMF_P422) {
-            IppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            ippiCopy_8u_C1R(src[1], src_strides[1] * 2, dst[1], dst_strides[1], roi2);
-            ippiCopy_8u_C1R(src[2], src_strides[2] * 2, dst[2], dst_strides[2], roi2);
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiCopy_8u_C1R(src[1], src_strides[1] * 2, dst[1], dst_strides[1], roi2);
+            vnxippiCopy_8u_C1R(src[2], src_strides[2] * 2, dst[2], dst_strides[2], roi2);
         }
         else if (src_emf == EMF_P440)
         {
             VnxIppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height/2 }, dst[1], dst_strides[1], roi2, 0.5, 1, IPPI_INTER_NN);
-            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height/2 }, dst[2], dst_strides[2], roi2, 0.5, 1, IPPI_INTER_NN);
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiResize_8u_C1R(src[1], { width, height }, src_strides[1], { 0,0,width,height/2 }, dst[1], dst_strides[1], roi2, 0.5, 1, VNXIPPI_INTER_NN);
+            vnxippiResize_8u_C1R(src[2], { width, height }, src_strides[2], { 0,0,width,height/2 }, dst[2], dst_strides[2], roi2, 0.5, 1, VNXIPPI_INTER_NN);
         }
         else if (src_emf == EMF_GRAY)
         {
-            IppiSize roi2 = { width / 2, height / 2 };
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
-            ippiSet_8u_C1R(0x80, dst[1], dst_strides[1], roi2);
-            ippiSet_8u_C1R(0x80, dst[2], dst_strides[2], roi2);
+            VnxIppiSize roi2 = { width / 2, height / 2 };
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiSet_8u_C1R(0x80, dst[1], dst_strides[1], roi2);
+            vnxippiSet_8u_C1R(0x80, dst[2], dst_strides[2], roi2);
         }
         else if (src_emf == EMF_YUY2)
         {
-            ippiYCbCr422ToYCbCr420_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
+            vnxippiYCbCr422ToYCbCr420_8u_C2P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }
         else if (src_emf == EMF_UYVY)
         {
             uint8_t* dst1[3] = { dst[0], dst[2], dst[1] };
             int dst_strides1[3] = { dst_strides[0], dst_strides[2], dst_strides[1] };
-            ippiCbYCr422ToYCrCb420_8u_C2P3R(src[0], src_strides[0], dst1, dst_strides1, roi);
+            vnxippiCbYCr422ToYCrCb420_8u_C2P3R(src[0], src_strides[0], dst1, dst_strides1, roi);
         }
         else if (src_emf == EMF_YVU9)
         {
             // never ever tested
-            ippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
+            vnxippiCopy_8u_C1R(src[0], src_strides[0], dst[0], dst_strides[0], roi);
             for (int y = 0; y<height / 4; ++y)
             {
                 const uint8_t* vs = src[1] + y*width / 4; //src[0] + width*height
@@ -428,11 +426,11 @@ public:
         }
         else if (src_emf == EMF_RGB32)
         {
-            ippiBGRToYCbCr420_8u_AC4P3R(src[0], src_strides[0], dst, dst_strides, roi);
+            vnxippiBGRToYCbCr420_8u_AC4P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }
         else if (src_emf == EMF_RGB24)
         {
-            ippiBGRToYCbCr420_8u_C3P3R(src[0], src_strides[0], dst, dst_strides, roi);
+            vnxippiBGRToYCbCr420_8u_C3P3R(src[0], src_strides[0], dst, dst_strides, roi);
         }
         else if (src_emf == EMF_RGB16)
         {
@@ -443,10 +441,10 @@ public:
         const uint8_t* const* src, int* src_strides,
         int dst_bpp, uint8_t* dst, int dst_stride) {
         if (dst_bpp == 32) {
-            ippiYCbCr420ToBGR_8u_P3C4R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height }, 0);
+            vnxippiYCbCr420ToBGR_8u_P3C4R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height }, 0);
         }
         else if (dst_bpp == 24) {
-            ippiYCbCr420ToBGR_8u_P3C3R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height });
+            vnxippiYCbCr420ToBGR_8u_P3C3R((const uint8_t**)src, src_strides, dst, dst_stride, { width, height });
         }
     }
 };

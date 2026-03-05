@@ -184,7 +184,8 @@
     <ClCompile Include="FFmpegEncoderImpl.cpp" />
     <ClCompile Include="FFmpegUtils.cpp" />
     <ClCompile Include="FileVideoSource.cpp" />
-    <ClCompile Include="ippimpl.cpp" />
+    <ClCompile Include="vnxipp_x64.cpp" />
+    <ClCompile Include="vnxipp_common.cpp" />
     <ClCompile Include="LocalTransport.cpp" />
     <ClCompile Include="openh264Common.cpp" />
     <ClCompile Include="openh264DecoderImpl.cpp" />

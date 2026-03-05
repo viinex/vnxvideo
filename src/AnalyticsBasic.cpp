@@ -221,7 +221,7 @@ private:
 
         vnxHistogramBasic_8u(m_buffer0.get(), m_stride, width, height, &m_histogram[0]);
         if (s != ippStsNoErr)
-            throw std::runtime_error("Could not perform ippiHistogramRange_8u_C1R");
+            throw std::runtime_error("Could not perform vnxHistogramBasic_8u");
         int sum = 0;
         for (int k = 0; k < 256; ++k) {
             sum += m_histogram[k];

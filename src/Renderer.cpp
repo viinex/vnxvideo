@@ -6,7 +6,7 @@
 #include <cmath>
 #include <cstring>
 
-#include <ipp/ippi.h>
+#include "vnxipp.h"
 
 extern "C" {
 #include <libswscale/swscale.h>
@@ -503,7 +503,7 @@ private:
     }
 
 
-    static void DrawRect_8u_C1(uint8_t* data, IppiSize size, int stride, IppiRect rect, uint8_t val) {
+    static void DrawRect_8u_C1(uint8_t* data, VnxIppiSize size, int stride, VnxIppiRect rect, uint8_t val) {
         uint8_t* b = data + rect.y*stride + rect.x;
         memset(b, val, rect.width);
         for (int k = 1; k < rect.height; ++k) {
@@ -559,9 +559,9 @@ private:
             w = (w / 8) * 8;
             h = (h / 8) * 8;
 
-            IppStatus s;
+            VnxIppStatus s;
             for (int j = 0; j < 3; ++j) {
-                s = ippiCopyWrapBorder_32s_C1R((int32_t*)planesBg[j], stridesBg[j], 
+                s = vnxippiCopyWrapBorder_32s_C1R((int32_t*)planesBg[j], stridesBg[j], 
                     { std::min(w,width) / (4 * planeSizeDiv[j]), std::min(h,height) / planeSizeDiv[j] },
                     (int32_t*)planes[j], strides[j], { width / (4 * planeSizeDiv[j]), height / planeSizeDiv[j] }, 0, 0);
             }
@@ -572,7 +572,7 @@ private:
             uint8_t backgroundYuv[3];
             rgb2yuv(backgroundColorRgb, backgroundYuv);
             for (int j = 0; j < 3; ++j){
-                ippiSet_8u_C1R(backgroundYuv[j], planes[j], strides[j], { width / planeSizeDiv[j], height / planeSizeDiv[j] });
+                vnxippiSet_8u_C1R(backgroundYuv[j], planes[j], strides[j], { width / planeSizeDiv[j], height / planeSizeDiv[j] });
             }	
         }
 
@@ -622,7 +622,7 @@ private:
             const int RoundSizeX = 16; // swscale works incorrectly if sizes not rounded to 16
             const int RoundSizeY = 4; // y coordinates should be at lease event as well
 
-            IppiRect srcRoi = {
+            VnxIppiRect srcRoi = {
                 (int)round(w*layout[k].src_left),
                 (int)round(h*layout[k].src_top),
                 (int)round(w*(layout[k].src_right - layout[k].src_left)),
@@ -648,7 +648,7 @@ private:
             else if (scale < scale_y)
                 dst_height *= scale / scale_y;
             
-            IppiRect dstRoi = {
+            VnxIppiRect dstRoi = {
                 (int)round((dst_center_x - dst_width*0.5f)*width),
                 (int)round((dst_center_y - dst_height*0.5f)*height),
                 (int)round(dst_width*width),
@@ -693,7 +693,7 @@ private:
 
             if (layout[k].border) {
                 for (int j = 0; j < 3; ++j) {
-                    IppiRect planeRoiDst = {
+                    VnxIppiRect planeRoiDst = {
                         dstRoi.x / planeSizeDiv[j],
                         dstRoi.y / planeSizeDiv[j],
                         dstRoi.width / planeSizeDiv[j],
