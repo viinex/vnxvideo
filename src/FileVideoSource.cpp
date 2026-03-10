@@ -355,7 +355,8 @@ private:
 
                                 if (len > 0) {
                                     uint8_t typ = (p.data[pos + 4] & 0x7e) >> 1;
-                                    if (typ >= 16 && typ <= 21) { // send vps/sps/pps before every irap frame
+                                    bool firstSlice = (p.data[pos + 6] & 0x80) != 0;
+                                    if (typ >= 16 && typ <= 21 && firstSlice) { // send vps/sps/pps before every irap nal unit which is the first slice of the picture
                                         CNoOwnershipNalBuffer vps(&m_vps[0], m_vps.size());
                                         onBuffer(&vps, ts);
                                         CNoOwnershipNalBuffer sps(&m_sps[0], m_sps.size());
