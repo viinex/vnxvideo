@@ -32,7 +32,10 @@ using json = nlohmann::json;
 #pragma comment(lib, "strmbase.lib")
 #endif
 
-#include "vnxipp.h"
+#include "../vnxipp.h"
+#include <ipp/ipp.h>
+#include <ipp/ippi.h>
+#include <ipp/ippcv.h>
 
 #include "../RawSample.h"
 
@@ -149,7 +152,7 @@ private:
         int pitchV = width / 2;
 
         IppiSize roi = { width, height };
-        Ipp8u* dst[3] = {
+        uint8_t* dst[3] = {
             dest + offsetY,
             dest + offsetU,
             dest + offsetV
