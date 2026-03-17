@@ -16,6 +16,11 @@ class COpenH264Decoder : public VnxVideo::IMediaDecoder
     std::shared_ptr<ISVCDecoder> m_decoder;
 public:
     COpenH264Decoder() {
+        bool allowCorruptOutput = false;
+        const char* const allowCorruptOutputStr = getenv("VNX_DECODE_OUTPUT_CORRUPT");
+        if (allowCorruptOutputStr != nullptr && strncmp(allowCorruptOutputStr, "0", 1) != 0)
+            allowCorruptOutput = true;
+
         ISVCDecoder* decoder = 0;
         long res = WelsCreateDecoder(&decoder);
         if (res != 0)
@@ -24,6 +29,8 @@ public:
         SDecodingParam param;
         memset(&param, 0, sizeof param);
         param.sVideoProperty.eVideoBsType = VIDEO_BITSTREAM_AVC;
+        if (allowCorruptOutput)
+            param.eEcActiveIdc = ERROR_CON_SLICE_COPY_CROSS_IDR;
         res = decoder->Initialize(&param);
         if (res != 0) {
             WelsDestroyDecoder(decoder);
@@ -58,7 +65,7 @@ public:
         if (res != 0) {
             VNXVIDEO_LOG(VNXLOG_DEBUG, "openh264decoder") << "ISVCDecoder::DecodeFrameNoDelay returned error " << res;
         }
-        else if (bufferInfo.iBufferStatus == 1) {
+        if (bufferInfo.iBufferStatus == 1) {
             pushDecoded(bufferInfo, dst);
         }
     }

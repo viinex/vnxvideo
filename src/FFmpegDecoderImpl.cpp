@@ -32,6 +32,11 @@ public:
         AVHWDeviceType hwDevType = AV_HWDEVICE_TYPE_NONE;
         FAVCCGetPixelFormat get_format = nullptr;
 
+        bool allowCorruptOutput = false;
+        const char* const allowCorruptOutputStr = getenv("VNX_DECODE_OUTPUT_CORRUPT");
+        if (allowCorruptOutputStr != nullptr && strncmp(allowCorruptOutputStr, "0", 1) != 0)
+            allowCorruptOutput = true;
+        
         const char* const hwDecoderEnv = getenv("VNX_HW_DECODER");
         if (hwDecoderEnv == 0 || strncmp(hwDecoderEnv, "0", 1) != 0) {
             std::tie(hwDevType, hwPixFmt, get_format) = fromHwDeviceType(m_codecImpl);
@@ -39,6 +44,10 @@ public:
 
         m_cc=createAvDecoderContext(m_codecID, hwDevType,
             [=](AVCodecContext& cc) {
+            if(allowCorruptOutput) {
+                cc.flags |= AV_CODEC_FLAG_OUTPUT_CORRUPT;
+                cc.flags2 |= AV_CODEC_FLAG2_SHOW_ALL;
+            }
             cc.thread_count = 1;
             cc.pkt_timebase = { 1,1000 };
             cc.time_base = { 1,1000 };
@@ -109,8 +118,19 @@ public:
     virtual void Flush() {
         AVPacket p;
         memset(&p, 0, sizeof p);
-        p.pts = AV_NOPTS_VALUE;
-        int res = avcodec_send_packet(m_cc.get(), &p);
+
+        av_parser_parse2(m_parser.get(), m_cc.get(), &p.data, &p.size, NULL, 0, AV_NOPTS_VALUE, AV_NOPTS_VALUE, 0);
+    
+        if (p.size > 0) {
+            //VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "Flushed " << p.size << " bytes from parser";
+            p.pts = m_parser->pts;
+            p.dts = m_parser->dts;
+            p.pos = -1;
+            avcodec_send_packet(m_cc.get(), &p);
+            fetchDecoded();
+        }
+
+        int res = avcodec_send_packet(m_cc.get(), NULL);
         if (0 != res)
             VNXVIDEO_LOG(VNXLOG_DEBUG, "ffmpeg") << "avcodec_send_packet failed: " << res << ": " << fferr2str(res);
         else
