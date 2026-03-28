@@ -14,6 +14,14 @@ extern "C" {
 #include "libavutil/opt.h"
 }
 
+#define CHECK_LOG_CCC_AV_RET(res, str) do { \
+        if ((res) < 0) { \
+            VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") \
+                << "CFFmpegEncoderImpl::checkCreateCc: " \
+                << (str) << ": res=" << (res) << ": " << fferr2str(res); \
+        } \
+    } while (false)
+
 
 class CFFmpegEncoderImpl : public VnxVideo::IMediaEncoder
 {
@@ -224,51 +232,46 @@ private:
             cc.pix_fmt = hwPixFmt;
             cc.width = m_width;
             cc.height = m_height;
-            cc.framerate = { 25, 1 };
+            cc.framerate = { m_fps, 1 };
             cc.flags |= AV_CODEC_FLAG_LOW_DELAY;
             cc.flags |= AV_CODEC_FLAG_CLOSED_GOP;
             cc.flags2 |= AV_CODEC_FLAG2_FAST;
             //cc.flags &= ~AV_CODEC_FLAG_GLOBAL_HEADER;
             //cc.flags2 |= AV_CODEC_FLAG2_LOCAL_HEADER;
-            cc.gop_size = 50;
+            cc.gop_size = m_fps;
             cc.max_b_frames = 0;
             cc.has_b_frames = 0;
 
             AVBufferRef* hw = nullptr;
 
             int res = av_opt_set(&cc, "profile", m_profile.c_str(), AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set profile: "
-                    << res << ": " << fferr2str(res);
-            }
+            CHECK_LOG_CCC_AV_RET(res, "Failed to set profile");
+
             res = av_opt_set(&cc, "preset", m_preset.c_str(), AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set preset: "
-                    << res << ": " << fferr2str(res);
-            }
-            if(m_quality.tag == VnxVideo::TEncoderQuality::eq_qp) {
+            CHECK_LOG_CCC_AV_RET(res, "Failed to set preset");
+
+            if (m_quality.tag == VnxVideo::TEncoderQuality::eq_qp) {
                 res = av_opt_set_int(&cc, "qp", (int)m_quality.qp.quality,
                                      AV_OPT_SEARCH_CHILDREN);
-                if (res < 0) {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
-                                                           << res << ": " << fferr2str(res);
-                }
+                CHECK_LOG_CCC_AV_RET(res, "Failed to set qp");
+            }
+            else if (m_quality.tag == VnxVideo::TEncoderQuality::eq_rc) {
+                cc.bit_rate = m_quality.rc.rate_target;
+                cc.rc_max_rate = m_quality.rc.rate_max;
+                cc.rc_buffer_size = m_quality.rc.rate_max * 2;
+
+                res = av_opt_set(&cc, "rc", "vbr", AV_OPT_SEARCH_CHILDREN);
+                CHECK_LOG_CCC_AV_RET(res, "Failed to set rc to vbr");
             }
             std::vector<const char*> enableOpts = { "forced_idr", "forced-idr" };
             std::vector<const char*> disableOpts = { "idr_interval", "sei", "timing", "extra_sei", "udu_sei", "aud", "s12m_tc", "a53cc", "a53_cc" };
             for(auto v: enableOpts) {
                 res = av_opt_set_int(&cc, v, 1, AV_OPT_SEARCH_CHILDREN);
-                if (res < 0) {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to enable " << v << ": "
-                                                           << res << ": " << fferr2str(res);
-                }
+                CHECK_LOG_CCC_AV_RET(res, std::string("Failed to enable ")+v);
             }
             for(auto v: disableOpts) {
                 res = av_opt_set_int(&cc, v, 0, AV_OPT_SEARCH_CHILDREN);
-                if (res < 0) {
-                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to disable " << v << ": "
-                                                           << res << ": " << fferr2str(res);
-                }
+                CHECK_LOG_CCC_AV_RET(res, std::string("Failed to disable ")+v);
             }
 
 #if defined(_WIN64) || defined(__linux__)
@@ -276,7 +279,7 @@ private:
             res = av_hwdevice_ctx_create(&hw, hwDevType, hwDevicePath, nullptr, 0);
             if (res != 0) {
                 VNXVIDEO_LOG(VNXLOG_INFO, "ffmpeg") << "CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed: " << res << ": " << fferr2str(res);
-		throw std::runtime_error("CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed");
+                throw std::runtime_error("CFFmpegEncoderImpl::checkCreateCc: av_hwdevice_ctx_create failed");
             }
             else {
                 cc.hw_device_ctx = hw;
