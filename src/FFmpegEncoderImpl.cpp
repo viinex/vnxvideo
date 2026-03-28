@@ -7,6 +7,8 @@
 #include "FFmpegUtils.h"
 #include "BufferImpl.h"
 
+#include "vnxvideoimpl.h"
+
 extern "C" {
 #include <libswscale/swscale.h>
 #include "libavutil/opt.h"
@@ -18,8 +20,7 @@ class CFFmpegEncoderImpl : public VnxVideo::IMediaEncoder
 private:
     std::string m_profile;
     std::string m_preset;
-    std::string m_quality;
-    const int m_qp;
+    const VnxVideo::TEncoderQuality m_quality;
     const int m_fps;
     const VnxVideo::ECodecImpl m_codecImpl;
 
@@ -33,13 +34,14 @@ private:
     int m_height;
     int m_nframe;
 public:
-    CFFmpegEncoderImpl(const char* profile, const char* preset, int fps, const char* quality, VnxVideo::ECodecImpl eci)
+    CFFmpegEncoderImpl(const char* profile, const char* preset, int fps,
+                       const VnxVideo::TEncoderQuality& quality,
+                       VnxVideo::ECodecImpl eci)
         : m_profile(profile)
         , m_preset(preset)
         , m_fps(fps)
         , m_quality(quality)
         , m_codecImpl(eci)
-        , m_qp(qualityEnumToQp(quality))
         , m_nframe(0)
     {
         if (m_preset == "ultrafast" || m_preset == "superfast") {
@@ -244,10 +246,13 @@ private:
                 VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set preset: "
                     << res << ": " << fferr2str(res);
             }
-            res = av_opt_set_int(&cc, "qp", m_qp, AV_OPT_SEARCH_CHILDREN);
-            if (res < 0) {
-                VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
-                    << res << ": " << fferr2str(res);
+            if(m_quality.tag == VnxVideo::TEncoderQuality::eq_qp) {
+                res = av_opt_set_int(&cc, "qp", (int)m_quality.qp.quality,
+                                     AV_OPT_SEARCH_CHILDREN);
+                if (res < 0) {
+                    VNXVIDEO_LOG(VNXLOG_DEBUG, "vnxvideo") << "CFFmpegEncoderImpl::checkCreateCc: Failed to set qp: "
+                                                           << res << ": " << fferr2str(res);
+                }
             }
             std::vector<const char*> enableOpts = { "forced_idr", "forced-idr" };
             std::vector<const char*> disableOpts = { "idr_interval", "sei", "timing", "extra_sei", "udu_sei", "aud", "s12m_tc", "a53cc", "a53_cc" };
@@ -280,43 +285,16 @@ private:
 #endif
         });
     }
-    static int qualityEnumToQp(const std::string& q)
-    {
-        if (q == "best_quality") {
-            return 18;
-        }
-        else if (q == "fine_quality") {
-            return 21;
-        }
-        else if (q == "good_quality") {
-            return 24;
-        }
-        else if (q == "normal") {
-            return 27;
-        }
-        else if (q == "small_size") {
-            return 32;
-        }
-        else if (q == "tiny_size") {
-            return 38;
-        }
-        else if (q == "best_size") {
-            return 45;
-        }
-        else {
-            throw std::runtime_error("`quality' enum literal value not recognized");
-        }
-    }
 };
 
 namespace VnxVideo {
     ECodecImpl encoderImplPrioTable[] = { ECodecImpl::ECI_CUDA, ECodecImpl::ECI_VAAPI, ECodecImpl::ECI_QSV, ECodecImpl::ECI_CPU };
 
-    IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci) {
+    IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const TEncoderQuality& quality, ECodecImpl eci) {
         return new CFFmpegEncoderImpl(profile, preset, fps, quality, eci);
     }
 
-    IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const TEncoderQuality& quality) {
         const char* const hwEncoderEnv = getenv("VNX_HW_ENCODER");
         if (hwEncoderEnv != 0 && strncmp(hwEncoderEnv, "0", 1) == 0 ) {
             return nullptr;

@@ -9,6 +9,7 @@
 #include "json.hpp"
 
 #include "vnxvideo.h"
+#include "EncoderQuality.h"
 
 namespace VnxVideo
 {
@@ -122,12 +123,11 @@ namespace VnxVideo
     };
     typedef std::shared_ptr<IMediaEncoder> PMediaEncoder;
 
-    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_x264(const char* profile, const char* preset, int fps, const char* quality);
-    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const TEncoderQuality& quality);
     // create encoder of specific hw accelerator implementation
-    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const char* quality, ECodecImpl eci);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg(const char* profile, const char* preset, int fps, const TEncoderQuality& quality, ECodecImpl eci);
     // automatically choose supported hw accelerator implementation
-    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const char* quality);
+    VNXVIDEO_DECLSPEC IMediaEncoder* CreateVideoEncoder_FFmpeg_Auto(const char* profile, const char* preset, int fps, const TEncoderQuality& quality);
     VNXVIDEO_DECLSPEC IMediaEncoder* CreateAsyncVideoEncoder(PMediaEncoder enc);
 
     class ITranscoder {

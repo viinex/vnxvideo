@@ -17,7 +17,7 @@ class COpenH264Encoder : public VnxVideo::IMediaEncoder
 private:
     const std::string m_profile;
     const std::string m_preset;
-    const std::string m_quality;
+    const VnxVideo::TEncoderQuality m_quality;
     const int m_fps;
     VnxVideo::TOnBufferCallback m_onBuffer;
 
@@ -28,7 +28,7 @@ private:
     int m_width;
     int m_height;
 public:
-    COpenH264Encoder(const char* profile, const char* preset, int fps, const char* quality)
+    COpenH264Encoder(const char* profile, const char* preset, int fps, const VnxVideo::TEncoderQuality quality)
         : m_profile(profile)
         , m_preset(preset)
         , m_fps(fps)
@@ -123,10 +123,9 @@ public:
     }
 private:
     void init(){
-        int qp;
         ECOMPLEXITY_MODE complexity;
         EProfileIdc profile;
-        qualityEnumToQpAndComplexity(m_profile, m_quality, m_preset, profile, qp, complexity);
+        convertProfileAndComplexity(m_profile, m_preset, profile, complexity);
 
         m_encoder.reset();
         std::unique_ptr<ISVCEncoder> encoder;
@@ -150,8 +149,7 @@ private:
         param.fMaxFrameRate = (float)m_fps;
         param.iPicWidth = m_width;
         param.iPicHeight = m_height;
-        param.iTargetBitrate = UNSPECIFIED_BIT_RATE;
-        param.iRCMode = RC_OFF_MODE; // RC_QUALITY_MODE;
+        
         param.iTemporalLayerNum = 1;
         param.iSpatialLayerNum = 1;
         for (int i = 0; i < param.iSpatialLayerNum; i++) {
@@ -160,18 +158,17 @@ private:
             param.sSpatialLayers[i].iVideoWidth = m_width >> (param.iSpatialLayerNum - 1 - i);
             param.sSpatialLayers[i].iVideoHeight = m_height >> (param.iSpatialLayerNum - 1 - i);
             param.sSpatialLayers[i].fFrameRate = (float)m_fps;
-            param.sSpatialLayers[i].iSpatialBitrate = UNSPECIFIED_BIT_RATE;
-            param.sSpatialLayers[i].iDLayerQp = qp;
-            param.sSpatialLayers[i].iMaxSpatialBitrate = UNSPECIFIED_BIT_RATE;
 
             param.sSpatialLayers[i].sSliceArgument.uiSliceMode = SM_SINGLE_SLICE;
             param.sSpatialLayers[i].sSliceArgument.uiSliceNum = 1;
+            param.sSpatialLayers[i].iSpatialBitrate = UNSPECIFIED_BIT_RATE;
+            param.sSpatialLayers[i].iMaxSpatialBitrate = UNSPECIFIED_BIT_RATE;
         }
+
         param.iEntropyCodingModeFlag = (profile == PRO_BASELINE) ? 0 : 1;
         param.bEnableDenoise = 0;
         param.bEnableBackgroundDetection = 1;
         param.bEnableAdaptiveQuant = 1;
-        param.bEnableFrameSkip = 0;
         param.bEnableLongTermReference = 0; // long term reference control
         param.iLtrMarkPeriod = 30;
         param.uiIntraPeriod = (m_fps ? m_fps : 30); // period of Intra frame
@@ -180,8 +177,31 @@ private:
         param.bPrefixNalAddingCtrl = 0;
         param.iComplexityMode = complexity;
         param.bSimulcastAVC = false;
-        param.iMaxQp = qp+1;
-        param.iMinQp = qp-1;
+
+        if(m_quality.tag == VnxVideo::TEncoderQuality::eq_qp) {
+            param.iRCMode = RC_OFF_MODE;
+            param.iTargetBitrate = UNSPECIFIED_BIT_RATE;
+            param.iMaxQp = (int)m_quality.qp.quality;
+            param.iMinQp = (int)m_quality.qp.quality;
+            for (int i = 0; i < param.iSpatialLayerNum; i++) {
+                param.sSpatialLayers[i].iDLayerQp = (int)m_quality.qp.quality;
+;
+            }
+            param.bEnableFrameSkip = 0;
+        }
+        else if(m_quality.tag == VnxVideo::TEncoderQuality::eq_rc) {
+            param.iRCMode = RC_BITRATE_MODE;
+            param.iTargetBitrate = m_quality.rc.rate_target;
+            for (int i = 0; i < param.iSpatialLayerNum; i++) {
+                param.sSpatialLayers[i].iSpatialBitrate = m_quality.rc.rate_target;
+                param.sSpatialLayers[i].iMaxSpatialBitrate = m_quality.rc.rate_max;
+            }
+            param.bEnableFrameSkip = 0;
+        }
+        else {
+            throw std::runtime_error("unsupported encoder quality mode");
+        }
+
         res = encoder->InitializeExt(&param);
         if (res) {
             VNXVIDEO_LOG(VNXLOG_ERROR, "openh264") << "ISVCEncoder::InitializeExt failed, res=" << res;
@@ -203,8 +223,10 @@ private:
             throw std::runtime_error("unsupported raw video format");
         }
     }
-    static void qualityEnumToQpAndComplexity(const std::string& f, const std::string& q, const std::string& p, 
-        EProfileIdc& profile, int& qp, ECOMPLEXITY_MODE& complexity)
+    static void convertProfileAndComplexity(const std::string& f,
+                                            const std::string& p, 
+                                            EProfileIdc& profile,
+                                            ECOMPLEXITY_MODE& complexity)
     {
         if (f == "baseline")
             profile = PRO_BASELINE;
@@ -223,36 +245,11 @@ private:
             complexity = HIGH_COMPLEXITY;
         else
             throw std::runtime_error("`preset' enum literal value not recognized");
-
-        if (q == "best_quality") {
-            qp = 18;
-        }
-        else if (q == "fine_quality") {
-            qp = 21;
-        }
-        else if (q == "good_quality") {
-            qp = 24;
-        }
-        else if (q == "normal") {
-            qp = 27;
-        }
-        else if (q == "small_size") {
-            qp = 32;
-        }
-        else if (q == "tiny_size") {
-            qp = 38;
-        }
-        else if (q == "best_size") {
-            qp = 45;
-        }
-        else {
-            throw std::runtime_error("`quality' enum literal value not recognized");
-        }
     }
 };
 
 namespace VnxVideo {
-    IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const char* quality) {
+    IMediaEncoder* CreateVideoEncoder_OpenH264(const char* profile, const char* preset, int fps, const TEncoderQuality& quality) {
         return new COpenH264Encoder(profile, preset, fps, quality);
     }
 }

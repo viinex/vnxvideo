@@ -367,42 +367,42 @@ int vnxvideo_h264_encoder_create(const char* json_config, vnxvideo_encoder_t* en
         std::string profile(jget<std::string>(j, "profile"));
         std::string preset(jget<std::string>(j,"preset"));
         int fps(jget<int>(j,"framerate", 25));
-        std::string quality(jget<std::string>(j, "quality", "normal"));
+        auto quality(jget<VnxVideo::TEncoderQuality>(j, "quality"));
         std::string type(jget<std::string>(j, "type", "auto"));
         if (type == "cpu") {
-            VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+            VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality));
             encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
             return vnxvideo_err_ok;
         }
         else if (type == "qsv") {
-            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_QSV);
+            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality, VnxVideo::ECodecImpl::ECI_QSV);
             return vnxvideo_err_ok;
         }
         else if (type == "cuda") {
-            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_CUDA);
+            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality, VnxVideo::ECodecImpl::ECI_CUDA);
             return vnxvideo_err_ok;
         }
 #if defined(__aarch64__)
         else if (type == "rkmpp") {
-            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_RKMPP);
+            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality, VnxVideo::ECodecImpl::ECI_RKMPP);
             return vnxvideo_err_ok;
         }
 #endif
         else if (type == "vaapi") {
-            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality.c_str(), VnxVideo::ECodecImpl::ECI_VAAPI);
+            encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg(profile.c_str(), preset.c_str(), fps, quality, VnxVideo::ECodecImpl::ECI_VAAPI);
             return vnxvideo_err_ok;
         }
         else if (type == "auto") {
             try {
-                encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg_Auto(profile.c_str(), preset.c_str(), fps, quality.c_str());
+                encoder->ptr = VnxVideo::CreateVideoEncoder_FFmpeg_Auto(profile.c_str(), preset.c_str(), fps, quality);
                 if (encoder->ptr == nullptr) {
-                    VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+                    VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality));
                     encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
                 }
             }
             catch (const VnxVideo::XHWDeviceNotSupported&) {
                 VNXVIDEO_LOG(VNXLOG_WARNING, "vnxvideo") << "Failed to create hw accelerated video encoder, CPU encoder is going to be used";
-                VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality.c_str()));
+                VnxVideo::PMediaEncoder enc(VnxVideo::CreateVideoEncoder_OpenH264(profile.c_str(), preset.c_str(), fps, quality));
                 encoder->ptr = VnxVideo::CreateAsyncVideoEncoder(enc);
             }
             return vnxvideo_err_ok;
