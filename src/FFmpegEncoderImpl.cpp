@@ -47,7 +47,7 @@ public:
                        VnxVideo::ECodecImpl eci)
         : m_profile(profile)
         , m_preset(preset)
-        , m_fps(fps)
+        , m_fps(fps?fps:25)
         , m_quality(quality)
         , m_codecImpl(eci)
         , m_nframe(0)
