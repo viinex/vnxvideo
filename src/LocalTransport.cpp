@@ -8,6 +8,7 @@
 #include <mutex>
 #include <system_error>
 #include <boost/asio.hpp>
+#include <boost/asio/io_context.hpp>
 #ifdef _WIN32
 #include <boost/asio/windows/stream_handle.hpp>
 #else
@@ -61,14 +62,14 @@ struct SConnection { // connection to a local transport client:
     size_t read;
 
 #ifdef _WIN32
-    SConnection(boost::asio::io_service& ios, pipe_t::native_handle_type handle)
+    SConnection(boost::asio::io_context& ios, pipe_t::native_handle_type handle)
         : pipe(ios, handle)
         , lastSeenIndex(0)
         , read(0)
     {
     }
 #else
-    SConnection(boost::asio::io_service& ios)
+    SConnection(boost::asio::io_context& ios)
         : pipe(ios)
         , lastSeenIndex(0)
         , read(0)
@@ -323,7 +324,7 @@ public:
     }
     void Flush() {}
 private:
-    boost::asio::io_service m_ios;
+    boost::asio::io_context m_ios;
 #ifndef _WIN32
     boost::asio::local::stream_protocol::acceptor m_acceptor;
 #endif
@@ -471,7 +472,7 @@ public:
             if (!m_running)
                 return;
         }
-        m_timer.expires_from_now(std::chrono::nanoseconds(1000000000));
+        m_timer.expires_after(std::chrono::nanoseconds(1000000000));
         m_timer.async_wait([this](const boost::system::error_code & ec) {
             if (!ec) {
                 try {
@@ -540,7 +541,7 @@ public:
     }
 private:
     const std::string m_address;
-    boost::asio::io_service m_ios;
+    boost::asio::io_context m_ios;
     boost::asio::steady_timer m_timer;
     pipe_t m_pipe;
     std::shared_ptr<IShmMapping> m_mapping;

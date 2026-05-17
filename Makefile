@@ -28,12 +28,12 @@ CXXFLAGS += -MMD -Iinclude -Iinclude/vnxvideo -I$(FFMPEG_HOME)/include -I$(IPP_H
 LDFLAGS += -L$(FFMPEG_HOME)/lib -L$(OPENH264_HOME)/lib -L$(IPP_HOME)/lib -L$(IPP_HOME)/lib/intel64_lin
 
 ifeq ($(UNAME_OS), Darwin)
-LDLIBS = -lopenh264 $(FFMPEGLIBS) $(IPPLIBS) -lpthread -lz -ldl -lboost_system
+LDLIBS = -lopenh264 $(FFMPEGLIBS) $(IPPLIBS) -lpthread -lz -ldl
 
 $(TARGET): $(OBJECTS)
 	c++ -shared $(LDFLAGS) -o $(TARGET) $(OBJECTS) $(LDLIBS)
 else
-LDLIBS = -l:libopenh264.a $(FFMPEGLIBS) $(IPPLIBS) -lpthread -lz -ldl -lrt -lboost_system
+LDLIBS = -l:libopenh264.a $(FFMPEGLIBS) $(IPPLIBS) -lpthread -lz -ldl -lrt
 
 $(TARGET): $(OBJECTS)
 	c++ -shared $(LDFLAGS) -Wl,-Bsymbolic -z defs -o $(TARGET) $(OBJECTS) $(LDLIBS)
